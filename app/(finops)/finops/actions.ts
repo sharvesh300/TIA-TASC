@@ -12,6 +12,17 @@ export async function resolveReviewAction(jobId: string, edits: RowEdit[]) {
   await resolveReview(jobId, edits, session.user.id);
   revalidatePath(`/finops/${jobId}`);
   revalidatePath("/finops");
+  revalidatePath("/finops/inbox");
+}
+
+/** Retry the pipeline from NEEDS_REVIEW with no row edits — for issues fixed
+ * elsewhere (e.g. a contract was just assigned in Admin), not in the row data. */
+export async function resumeJobAction(jobId: string) {
+  const session = await requireRole(["FINOPS", "ADMIN"]);
+  await resolveReview(jobId, [], session.user.id);
+  revalidatePath(`/finops/${jobId}`);
+  revalidatePath("/finops");
+  revalidatePath("/finops/inbox");
 }
 
 export async function rerunExtractionAction(jobId: string) {

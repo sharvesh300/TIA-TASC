@@ -76,6 +76,7 @@ export default async function FinOpsJobPage({
           ) : job.status === "NEEDS_REVIEW" ? (
             <ReviewEditor
               jobId={job.id}
+              reason={job.failureReason}
               rows={rows.map((r) => ({
                 id: r.id,
                 empId: r.empId ?? "",

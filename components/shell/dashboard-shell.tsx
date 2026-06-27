@@ -1,10 +1,10 @@
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { AppSidebar, type NavItem } from "@/components/shell/app-sidebar";
+import { AppSidebar, type NavItem, type NavGroup } from "@/components/shell/app-sidebar";
 
 type DashboardShellProps = {
-  nav: NavItem[];
+  nav: NavItem[] | NavGroup[];
   user: {
     email: string;
     role: string;

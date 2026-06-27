@@ -29,7 +29,12 @@ export default async function FinOpsPage() {
           Financial Operations Pipeline
         </h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Overview of all incoming client timesheets. Process, validate, and dispatch invoices on demand.
+          Every timesheet flows through extraction, invoicing, and validation automatically.
+          This view is the full history — for items that need a human, see the{" "}
+          <Link href="/finops/inbox" className="font-medium text-foreground underline-offset-2 hover:underline">
+            Inbox
+          </Link>
+          .
         </p>
       </div>
 
@@ -49,20 +54,22 @@ export default async function FinOpsPage() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-all duration-300 hover:border-amber-500/50 group/card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">Needs Review</CardTitle>
-              <CardDescription>Requires validation</CardDescription>
-            </div>
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 group-hover/card:bg-amber-500 group-hover/card:text-white transition-all duration-300">
-              <AlertCircle className="size-5" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold font-heading text-amber-500">{needsReview}</div>
-          </CardContent>
-        </Card>
+        <Link href="/finops/inbox">
+          <Card className="hover:shadow-md transition-all duration-300 hover:border-amber-500/50 group/card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Needs Review</CardTitle>
+                <CardDescription>In the inbox</CardDescription>
+              </div>
+              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 group-hover/card:bg-amber-500 group-hover/card:text-white transition-all duration-300">
+                <AlertCircle className="size-5" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold font-heading text-amber-500">{needsReview}</div>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card className="hover:shadow-md transition-all duration-300 hover:border-emerald-500/50 group/card">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">

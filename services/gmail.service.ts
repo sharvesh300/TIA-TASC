@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 const GMAIL_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
-const ACCEPTED_EXTENSIONS = new Set(["xlsx", "xls", "pdf", "png", "jpg", "jpeg"]);
+const ACCEPTED_EXTENSIONS = new Set(["xlsx", "xls", "csv", "pdf", "png", "jpg", "jpeg"]);
 
 // ─── OAuth2 Token ────────────────────────────────────────────────────────────
 
@@ -179,8 +179,8 @@ async function processMessage(messageId: string): Promise<GmailIngestResult> {
   const jobsCreated: string[] = [];
 
   for (const att of attachments) {
-    const bytes = await downloadAttachment(messageId, att.attachmentId!);
-    const file = new File([bytes], att.filename!, { type: mimeTypeFor(att.filename!) });
+    const bytes = await downloadAttachment(messageId, att.body!.attachmentId!);
+    const file = new File([new Uint8Array(bytes)], att.filename!, { type: mimeTypeFor(att.filename!) });
 
     const job = await createJobFromUpload({
       clientId,
@@ -243,6 +243,7 @@ function mimeTypeFor(filename: string): string {
   const map: Record<string, string> = {
     xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     xls: "application/vnd.ms-excel",
+    csv: "text/csv",
     pdf: "application/pdf",
     png: "image/png",
     jpg: "image/jpeg",

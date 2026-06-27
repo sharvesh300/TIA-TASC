@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FileText, RefreshCw, ShieldCheck } from "lucide-react";
+import { FileText, RefreshCw, ShieldCheck, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { JobStatus } from "@/lib/generated/prisma/client";
-import { generateInvoiceAction, rerunExtractionAction, validateInvoiceAction } from "./actions";
+import {
+  generateInvoiceAction,
+  rerunExtractionAction,
+  resumeJobAction,
+  validateInvoiceAction,
+} from "./actions";
 
 // Action buttons for a pipeline job, shown according to the job's current stage.
 export function JobActions({
@@ -30,13 +35,20 @@ export function JobActions({
     });
   }
 
-  const canExtract = status !== "DISPATCHED";
+  const canExtract = status !== "DISPATCHED" && status !== "NEEDS_REVIEW";
+  const canResume = status === "NEEDS_REVIEW";
   const canGenerate = status === "EXTRACTED";
   const canValidate = status === "VALIDATING" && Boolean(invoiceId);
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
+        {canResume && (
+          <Button size="sm" onClick={() => run(() => resumeJobAction(jobId))} disabled={pending}>
+            <PlayCircle />
+            Resume pipeline
+          </Button>
+        )}
         {canExtract && (
           <Button
             variant="outline"
@@ -65,6 +77,13 @@ export function JobActions({
           </Button>
         )}
       </div>
+      {canResume && !error && (
+        <p className="text-xs text-muted-foreground">
+          The pipeline auto-advances after extraction, invoicing, and validation. Use{" "}
+          <strong>Resume pipeline</strong> once the underlying issue (e.g. a missing contract or
+          unmatched employee) is fixed elsewhere, or correct the rows below first.
+        </p>
+      )}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );

@@ -1,11 +1,13 @@
-// Demo seed: runs the sample timesheets through the REAL pipeline services and
-// parks jobs at each stage so every role sees the automation in action on login:
+// Demo seed: runs the sample timesheets through the REAL pipeline (now fully
+// auto-advancing — createJobFromUpload drives each job to READY_FOR_DISPATCH
+// or NEEDS_REVIEW on its own). We only step in manually to push one job all
+// the way to DISPATCHED so every role has something in its history on login:
 //
 //   - Al Marwan : clean.xlsx  → DISPATCHED   (Client sees a finished invoice + PDF;
 //                                             Reviewer sees it in history)
-//   - Gulf Star : clean.xlsx  → VALIDATED    (Reviewer approval queue)
+//   - Gulf Star : clean.xlsx  → READY_FOR_DISPATCH / VALIDATED (Reviewer queue)
 //   - Gulf Star : messy.xlsx  → NEEDS_REVIEW (FinOps review editor)
-//   - Zenith    : clean.xlsx  → EXTRACTED    (FinOps "generate invoice")
+//   - Zenith    : clean.xlsx  → READY_FOR_DISPATCH (auto-processed end to end)
 //   - Zenith    : scan.png    → NEEDS_REVIEW (FinOps review — OCR/Tesseract)
 //
 // Run: bunx tsx scripts/seed-demo.ts   (after `bun run samples`)
@@ -15,8 +17,6 @@ import path from "node:path";
 import { PrismaClient } from "../lib/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createJobFromUpload } from "../services/ingest.service";
-import { generateInvoice } from "../services/invoice.service";
-import { runValidations } from "../services/validation.service";
 import { approveAndDispatch } from "../services/dispatch.service";
 import { getInvoiceByClientPeriod } from "../repositories/invoice.repo";
 
@@ -62,41 +62,33 @@ async function main() {
   const gulfStar = byCode("GULFSTAR");
   const zenith = byCode("ZENITHRC");
 
-  const finops = await prisma.user.findUnique({ where: { email: "finops@tia.demo" } });
   const reviewer = await prisma.user.findUnique({ where: { email: "reviewer@tia.demo" } });
 
-  // 1) Al Marwan: clean → fully processed → DISPATCHED.
+  // 1) Al Marwan: clean → auto-advances to READY_FOR_DISPATCH, then approve → DISPATCHED.
   console.log("Al Marwan: processing clean.xlsx → DISPATCHED...");
-  const jobA = await createJobFromUpload({
+  await createJobFromUpload({
     clientId: alMarwan.id,
     file: await fileFromSample("al-marwan-facilities-clean.xlsx"),
   });
-  await generateInvoice(jobA.id, finops?.id);
   const invA = await getInvoiceByClientPeriod(alMarwan.id, "2026-06");
-  if (invA) {
-    await runValidations(invA.id, finops?.id);
-    await approveAndDispatch(invA.id, reviewer?.id);
-  }
+  if (invA) await approveAndDispatch(invA.id, reviewer?.id);
 
-  // 2) Gulf Star: clean → VALIDATED (waits in the reviewer queue).
-  console.log("Gulf Star: processing clean.xlsx → VALIDATED (reviewer queue)...");
-  const jobB = await createJobFromUpload({
+  // 2) Gulf Star: clean → auto-advances to READY_FOR_DISPATCH (reviewer queue).
+  console.log("Gulf Star: processing clean.xlsx → READY_FOR_DISPATCH (reviewer queue)...");
+  await createJobFromUpload({
     clientId: gulfStar.id,
     file: await fileFromSample("gulf-star-logistics-clean.xlsx"),
   });
-  await generateInvoice(jobB.id, finops?.id);
-  const invB = await getInvoiceByClientPeriod(gulfStar.id, "2026-06");
-  if (invB) await runValidations(invB.id, finops?.id);
 
-  // 3) Gulf Star: messy → NEEDS_REVIEW (FinOps review editor).
+  // 3) Gulf Star: messy → auto-pauses at NEEDS_REVIEW (FinOps review editor).
   console.log("Gulf Star: processing messy.xlsx → NEEDS_REVIEW...");
   await createJobFromUpload({
     clientId: gulfStar.id,
     file: await fileFromSample("al-marwan-facilities-messy.xlsx"),
   });
 
-  // 4) Zenith: clean → EXTRACTED (FinOps generate-invoice demo).
-  console.log("Zenith: processing clean.xlsx → EXTRACTED...");
+  // 4) Zenith: clean → auto-advances end to end on its own.
+  console.log("Zenith: processing clean.xlsx → READY_FOR_DISPATCH...");
   await createJobFromUpload({
     clientId: zenith.id,
     file: await fileFromSample("zenith-retail-co-clean.xlsx"),

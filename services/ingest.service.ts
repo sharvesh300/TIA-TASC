@@ -10,6 +10,7 @@ import { advanceJob } from "@/services/orchestrator.service";
 const FORMAT_BY_EXTENSION: Record<string, DocumentFormat> = {
   xlsx: "XLSX",
   xls: "XLSX",
+  csv: "XLSX", // CSV rides the XLSX format; agents/document.agent.ts splits by extension
   pdf: "PDF",
   png: "IMAGE",
   jpg: "IMAGE",
@@ -21,6 +22,7 @@ export function detectFormat(fileName: string, mimeType?: string): DocumentForma
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
   if (FORMAT_BY_EXTENSION[ext]) return FORMAT_BY_EXTENSION[ext];
   if (mimeType?.includes("spreadsheet")) return "XLSX";
+  if (mimeType === "text/csv") return "XLSX";
   if (mimeType === "application/pdf") return "PDF";
   if (mimeType?.startsWith("image/")) return "IMAGE";
   throw new Error(`Unsupported file type: ${fileName}`);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,7 +26,15 @@ interface EditableRow {
 
 const LOW_CONFIDENCE = 0.9;
 
-export function ReviewEditor({ jobId, rows }: { jobId: string; rows: EditableRow[] }) {
+export function ReviewEditor({
+  jobId,
+  rows,
+  reason,
+}: {
+  jobId: string;
+  rows: EditableRow[];
+  reason?: string | null;
+}) {
   const [draft, setDraft] = useState(rows);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +65,7 @@ export function ReviewEditor({ jobId, rows }: { jobId: string; rows: EditableRow
     startTransition(async () => {
       try {
         await resolveReviewAction(jobId, edits);
+        toast.success("Rows approved — resuming pipeline.");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to save review.");
       }
@@ -64,6 +74,15 @@ export function ReviewEditor({ jobId, rows }: { jobId: string; rows: EditableRow
 
   return (
     <div className="space-y-3">
+      {reason && (
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+          <span className="font-medium">Why this needs review:</span> {reason}
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Cells highlighted in red are low-confidence extractions — double-check them against the
+        source document before approving.
+      </p>
       <div className="rounded-lg border">
         <Table>
           <TableHeader>

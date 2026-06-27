@@ -39,5 +39,8 @@ export async function resolveReview(jobId: string, edits: RowEdit[], userId?: st
     metadata: { rowCount: edits.length },
   });
 
+  // Resume the automated pipeline now that the blocking issue is fixed.
+  await advanceJob(jobId, userId);
+
   return { rowCount: edits.length };
 }

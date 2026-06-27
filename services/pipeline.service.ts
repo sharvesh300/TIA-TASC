@@ -22,7 +22,7 @@ export const ALLOWED_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   VALIDATING: ["READY_FOR_DISPATCH", "NEEDS_REVIEW", "FAILED"],
   READY_FOR_DISPATCH: ["DISPATCHED", "NEEDS_REVIEW", "FAILED"],
   DISPATCHED: [],
-  FAILED: ["QUEUED"], // allow re-queue/retry after a failure
+  FAILED: ["QUEUED", "EXTRACTING"], // allow re-queue/retry after a failure
 };
 
 export class InvalidTransitionError extends Error {

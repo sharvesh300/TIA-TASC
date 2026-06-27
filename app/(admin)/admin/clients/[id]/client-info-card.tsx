@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EditClientDialog } from "../client-dialog";
 import type { Client } from "@/lib/generated/prisma/client";
+import { formatDate } from "@/lib/utils";
 
 export function ClientInfoCard({ client }: { client: Client }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -35,7 +36,7 @@ export function ClientInfoCard({ client }: { client: Client }) {
           </div>
           <div>
             <dt className="text-muted-foreground">Created</dt>
-            <dd>{client.createdAt.toLocaleDateString()}</dd>
+            <dd>{formatDate(client.createdAt)}</dd>
           </div>
         </dl>
       </CardContent>

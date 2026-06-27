@@ -10,9 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { JobStatusBadge } from "@/components/pipeline/job-status-badge";
 import { requireRole } from "@/lib/require-role";
 import { listJobsByClient } from "@/repositories/job.repo";
-import { listInvoicesByClient } from "@/repositories/invoice.repo";
+import { listClientInboxJobs } from "@/repositories/inbox.repo";
 import { UploadForm } from "./upload-form";
-import { CloudUpload, CheckCircle, Clock, CreditCard } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 export default async function ClientPortalPage() {
   const session = await requireRole(["CLIENT", "ADMIN"]);
@@ -30,89 +30,38 @@ export default async function ClientPortalPage() {
   }
 
   const jobs = await listJobsByClient(clientId);
-  const invoices = await listInvoicesByClient(clientId);
-
-  const totalTimesheets = jobs.length;
-  const approvedInvoicesCount = invoices.filter((inv) => inv.status === "APPROVED" || inv.status === "DISPATCHED").length;
-  const pendingActionCount = invoices.filter((inv) => inv.status === "DRAFT" || inv.status === "VALIDATED").length;
-  const totalBilledAmount = invoices
-    .filter((inv) => inv.status === "APPROVED" || inv.status === "DISPATCHED")
-    .reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+  const attentionJobs = await listClientInboxJobs(clientId);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="font-heading text-3xl font-bold tracking-tight bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600 bg-clip-text text-transparent dark:from-teal-400 dark:via-emerald-400 dark:to-green-400">
-          Client Timesheet &amp; Invoice Portal
+          Upload Portal
         </h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
           Upload timesheets and track invoice extraction, validation, and approval status in real time.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-md transition-all duration-300 hover:border-teal-500/50 group/card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+      {attentionJobs.length > 0 && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="flex flex-wrap items-center gap-3 py-4">
+            <div className="rounded-lg bg-amber-500/10 p-2 text-amber-500 shrink-0">
+              <AlertTriangle className="size-4" />
+            </div>
             <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">Timesheets Sent</CardTitle>
-              <CardDescription>Total uploaded files</CardDescription>
-            </div>
-            <div className="p-2 rounded-lg bg-teal-500/10 text-teal-500 group-hover/card:bg-teal-500 group-hover/card:text-white transition-all duration-300">
-              <CloudUpload className="size-5" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold font-heading">{totalTimesheets}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-all duration-300 hover:border-emerald-500/50 group/card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">Approved Invoices</CardTitle>
-              <CardDescription>Ready for billing</CardDescription>
-            </div>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 group-hover/card:bg-emerald-500 group-hover/card:text-white transition-all duration-300">
-              <CheckCircle className="size-5" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold font-heading text-emerald-500">{approvedInvoicesCount}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-all duration-300 hover:border-amber-500/50 group/card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pending Action</CardTitle>
-              <CardDescription>Awaiting review</CardDescription>
-            </div>
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 group-hover/card:bg-amber-500 group-hover/card:text-white transition-all duration-300">
-              <Clock className="size-5" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold font-heading text-amber-500">{pendingActionCount}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-all duration-300 hover:border-green-500/50 group/card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Billed Amount</CardTitle>
-              <CardDescription>Approved sum</CardDescription>
-            </div>
-            <div className="p-2 rounded-lg bg-green-500/10 text-green-500 group-hover/card:bg-green-500 group-hover/card:text-white transition-all duration-300">
-              <CreditCard className="size-5" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-heading text-green-600 dark:text-green-400">
-              AED {totalBilledAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <p className="font-medium text-sm">
+                {attentionJobs.length} timesheet{attentionJobs.length > 1 ? "s" : ""} need
+                {attentionJobs.length > 1 ? "" : "s"} attention
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Our team flagged {attentionJobs.length === 1 ? "it" : "them"} for review — no action
+                needed from you, but processing is paused. Check the status column below.
+              </p>
             </div>
           </CardContent>
         </Card>
-      </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-1">

@@ -31,10 +31,11 @@ export default async function ReviewerPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="font-heading text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400">
-          Invoice Approval Portal
+          Inbox
         </h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Review, approve, and dispatch validated invoices. Audited details and resolution logs are tracked automatically.
+          Invoices that have passed validation and are waiting on your approval. Everything else
+          is still flowing through the pipeline automatically.
         </p>
       </div>
 
@@ -103,10 +104,14 @@ export default async function ReviewerPage() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="font-heading text-xl font-semibold">Validation Queue</h2>
+        <h2 className="font-heading text-xl font-semibold">Awaiting your approval</h2>
         {queue.length === 0 && (
-          <Card className="p-8 text-center text-muted-foreground">
-            No invoices awaiting approval at this moment.
+          <Card className="border-dashed p-12 text-center">
+            <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
+              <CheckSquare className="size-5" />
+            </div>
+            <p className="font-medium">Inbox zero</p>
+            <p className="text-sm text-muted-foreground">No invoices awaiting approval right now.</p>
           </Card>
         )}
         <div className="grid gap-4">

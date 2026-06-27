@@ -40,11 +40,11 @@ export function UploadForm() {
           id="file"
           name="file"
           type="file"
-          accept=".xlsx,.xls,.pdf,.png,.jpg,.jpeg,.webp"
+          accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.webp"
           required
         />
         <p className="text-xs text-muted-foreground">
-          Excel, PDF, or image. Excel is parsed directly; PDFs and images use OCR.
+          Excel, CSV, PDF, or image. Spreadsheets are parsed directly; PDFs and images use OCR.
         </p>
       </div>
       <SubmitButton />

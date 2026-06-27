@@ -27,7 +27,7 @@ export async function runExtraction(jobId: string, actorId?: string | null) {
     const buffer = await readStoredFile(job.fileUrl);
 
     let engine: ExtractionEngine = job.format === "XLSX" ? "EXCEL" : "TESSERACT";
-    let result = await routeDocument(job.format, buffer);
+    let result = await routeDocument(job.format, buffer, job.originalFileName);
 
     // Escalate OCR paths to GPT-4o when confidence is low or nothing parsed.
     const needsEscalation =

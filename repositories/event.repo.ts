@@ -38,3 +38,13 @@ export function listEventsByJob(jobId: string) {
     orderBy: { createdAt: "asc" },
   });
 }
+
+/** Most recent pipeline events across jobs — feeds dashboard "recent activity" panels. */
+export function listRecentEvents(take = 8, clientId?: string) {
+  return prisma.pipelineEvent.findMany({
+    where: clientId ? { job: { clientId } } : undefined,
+    orderBy: { createdAt: "desc" },
+    take,
+    include: { job: { select: { client: { select: { name: true } }, originalFileName: true } } },
+  });
+}

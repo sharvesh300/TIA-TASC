@@ -20,6 +20,7 @@ import { NewContractDialog } from "./contract-dialog";
 import { EmployeeRoster } from "./employee-roster";
 import { EmployeeAssign } from "./employee-assign";
 import { NewEmployeeDialog } from "../../employees/employee-dialog";
+import { formatDate } from "@/lib/utils";
 
 export default async function ClientDetailPage({
   params,
@@ -90,8 +91,8 @@ export default async function ClientDetailPage({
               )}
               {contracts.map((contract) => (
                 <TableRow key={contract.id}>
-                  <TableCell>{contract.validFrom.toLocaleDateString()}</TableCell>
-                  <TableCell>{contract.validTo ? contract.validTo.toLocaleDateString() : "—"}</TableCell>
+                  <TableCell>{formatDate(contract.validFrom)}</TableCell>
+                  <TableCell>{formatDate(contract.validTo)}</TableCell>
                   <TableCell>{Number(contract.markupPercent)}%</TableCell>
                   <TableCell>{contract.paymentTermsDays} days</TableCell>
                   <TableCell>{contract.currency}</TableCell>
