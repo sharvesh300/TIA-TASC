@@ -18,7 +18,7 @@ export async function createEmployeeAction(
 ): Promise<EmployeeFormState> {
   await requireRole(["ADMIN"]);
 
-  const clientId = formData.get("clientId") as string;
+  const clientId = (formData.get("clientId") as string) || null;
   const empId = formData.get("empId") as string;
   const fullName = formData.get("fullName") as string;
   const email = (formData.get("email") as string) || null;
@@ -28,8 +28,8 @@ export async function createEmployeeAction(
   const dateOfJoining = parseDate(formData.get("dateOfJoining") as string);
   const iban = (formData.get("iban") as string) || null;
 
-  if (!clientId || !empId?.trim() || !fullName?.trim()) {
-    return { error: "Client, employee ID, and name are required." };
+  if (!empId?.trim() || !fullName?.trim()) {
+    return { error: "Employee ID and name are required." };
   }
 
   try {
@@ -59,7 +59,7 @@ export async function updateEmployeeAction(
   await requireRole(["ADMIN"]);
 
   const id = formData.get("id") as string;
-  const clientId = formData.get("clientId") as string;
+  const clientId = (formData.get("clientId") as string) || null;
   const empId = formData.get("empId") as string;
   const fullName = formData.get("fullName") as string;
   const email = (formData.get("email") as string) || null;
@@ -69,8 +69,8 @@ export async function updateEmployeeAction(
   const dateOfJoining = parseDate(formData.get("dateOfJoining") as string);
   const iban = (formData.get("iban") as string) || null;
 
-  if (!id || !clientId || !empId?.trim() || !fullName?.trim()) {
-    return { error: "Client, employee ID, and name are required." };
+  if (!id || !empId?.trim() || !fullName?.trim()) {
+    return { error: "Employee ID and name are required." };
   }
 
   try {

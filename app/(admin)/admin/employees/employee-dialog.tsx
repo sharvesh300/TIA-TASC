@@ -45,16 +45,19 @@ function SubmitButton({ label }: { label: string }) {
   );
 }
 
-function ClientSelect({ clients, defaultValue }: { clients: { id: string; name: string }[]; defaultValue?: string }) {
-  const [value, setValue] = useState(defaultValue ?? "");
+const UNASSIGNED_VALUE = "__unassigned__";
+
+function ClientSelect({ clients, defaultValue }: { clients: { id: string; name: string }[]; defaultValue?: string | null }) {
+  const [value, setValue] = useState(defaultValue || UNASSIGNED_VALUE);
   return (
     <>
-      <input type="hidden" name="clientId" value={value} />
+      <input type="hidden" name="clientId" value={value === UNASSIGNED_VALUE ? "" : value} />
       <Select value={value} onValueChange={setValue}>
         <SelectTrigger>
           <SelectValue placeholder="Select a client" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value={UNASSIGNED_VALUE}>Unassigned</SelectItem>
           {clients.map((client) => (
             <SelectItem key={client.id} value={client.id}>
               {client.name}
@@ -66,7 +69,13 @@ function ClientSelect({ clients, defaultValue }: { clients: { id: string; name: 
   );
 }
 
-export function NewEmployeeDialog({ clients }: { clients: { id: string; name: string }[] }) {
+export function NewEmployeeDialog({
+  clients,
+  defaultClientId,
+}: {
+  clients: { id: string; name: string }[];
+  defaultClientId?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createEmployeeAction, initialState);
   const wasPending = useRef(false);
@@ -95,7 +104,7 @@ export function NewEmployeeDialog({ clients }: { clients: { id: string; name: st
           <div className="grid gap-3 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="clientId">Client</Label>
-              <ClientSelect clients={clients} />
+              <ClientSelect clients={clients} defaultValue={defaultClientId} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="empId">Employee ID</Label>

@@ -1,10 +1,11 @@
 // Ingest stage: accept an uploaded timesheet, persist the bytes, create a
 // PipelineJob, and move it to QUEUED so extraction can pick it up.
 import type { DocumentFormat, SourceChannel } from "@/lib/generated/prisma/client";
+import { prisma } from "@/lib/prisma";
 import { saveFile, uploadPath } from "@/lib/storage";
 import { createJob, updateJob } from "@/repositories/job.repo";
 import { transition } from "@/services/pipeline.service";
-import { runExtraction } from "@/services/extraction.service";
+import { advanceJob } from "@/services/orchestrator.service";
 
 const FORMAT_BY_EXTENSION: Record<string, DocumentFormat> = {
   xlsx: "XLSX",
@@ -36,8 +37,21 @@ export async function createJobFromUpload({ clientId, file, sourceChannel = "POR
   const format = detectFormat(file.name, file.type);
   const bytes = Buffer.from(await file.arrayBuffer());
 
+  const client = await prisma.client.findFirst({
+    where: {
+      OR: [
+        { id: clientId },
+        { code: clientId },
+      ],
+    },
+  });
+
+  if (!client) {
+    throw new Error(`Client not found for identifier: ${clientId}`);
+  }
+
   const job = await createJob({
-    client: { connect: { id: clientId } },
+    client: { connect: { id: client.id } },
     sourceChannel,
     format,
     fileUrl: "",
@@ -57,11 +71,12 @@ export async function createJobFromUpload({ clientId, file, sourceChannel = "POR
     metadata: { originalFileName: file.name, format, fileSize: bytes.length },
   });
 
-  // Kick off extraction immediately so the pipeline advances on upload. Errors
-  // are handled inside runExtraction (the job is marked FAILED) and must not
-  // fail the upload itself, which already succeeded.
+  // Kick off the full pipeline immediately so jobs flow end-to-end on upload
+  // without manual clicks. Errors are handled inside each stage (the job is
+  // marked FAILED or NEEDS_REVIEW) and must not fail the upload itself, which
+  // already succeeded.
   try {
-    await runExtraction(job.id);
+    await advanceJob(job.id);
   } catch {
     // swallow — job status already reflects the failure
   }

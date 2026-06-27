@@ -4,6 +4,7 @@
 import { getJobById } from "@/repositories/job.repo";
 import { updateExtractedRow } from "@/repositories/extracted-row.repo";
 import { transition } from "@/services/pipeline.service";
+import { advanceJob } from "@/services/orchestrator.service";
 
 export interface RowEdit {
   rowId: string;

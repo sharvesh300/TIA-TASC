@@ -13,10 +13,7 @@ export function findEmployeesByClientAndName(clientId: string, fullName: string)
   return prisma.employee.findMany({
     where: {
       clientId,
-      fullName: {
-        equals: fullName,
-        mode: "insensitive",
-      },
+      fullName: { equals: fullName, mode: "insensitive" },
     },
   });
 }
@@ -34,7 +31,7 @@ export function countActiveEmployees() {
 }
 
 export function createEmployee(data: {
-  clientId: string;
+  clientId?: string | null;
   empId: string;
   fullName: string;
   email?: string | null;
@@ -50,7 +47,7 @@ export function createEmployee(data: {
 export function updateEmployee(
   id: string,
   data: Partial<{
-    clientId: string;
+    clientId: string | null;
     empId: string;
     fullName: string;
     email: string | null;
@@ -63,6 +60,18 @@ export function updateEmployee(
   }>
 ) {
   return prisma.employee.update({ where: { id }, data });
+}
+
+export function listUnassignedEmployees() {
+  return prisma.employee.findMany({ where: { clientId: { equals: null } }, orderBy: { fullName: "asc" } });
+}
+
+export function assignEmployeeToClient(employeeId: string, clientId: string) {
+  return updateEmployee(employeeId, { clientId });
+}
+
+export function unassignEmployeeFromClient(employeeId: string) {
+  return updateEmployee(employeeId, { clientId: null });
 }
 
 export async function listEmployeesFiltered({

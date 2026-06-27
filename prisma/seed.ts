@@ -25,7 +25,60 @@ function randomFrom<T>(arr: T[]): T {
 async function main() {
   console.log("Seeding clients...");
   const clients = [];
-  for (const c of CLIENTS) {
+  const clientValidationRules = [
+    // Al Marwan: stricter (max 29 days, tight tolerance)
+    {
+      TOTALS_MATCH: { enabled: true, tolerance: 0.005, severity: "BLOCKER" as const },
+      REQUIRED_FIELDS_PRESENT: { enabled: true, severity: "BLOCKER" as const },
+      WORKING_DAYS_IN_RANGE: { enabled: true, minDays: 1, maxDays: 29, severity: "WARNING" as const },
+      NO_DUPLICATE_EMPLOYEE: { enabled: true, severity: "BLOCKER" as const },
+    },
+    // Gulf Star: lenient (max 32 days, loose tolerance)
+    {
+      TOTALS_MATCH: { enabled: true, tolerance: 0.1, severity: "WARNING" as const },
+      REQUIRED_FIELDS_PRESENT: { enabled: true, severity: "BLOCKER" as const },
+      WORKING_DAYS_IN_RANGE: { enabled: true, minDays: 1, maxDays: 32, severity: "WARNING" as const },
+      NO_DUPLICATE_EMPLOYEE: { enabled: true, severity: "BLOCKER" as const },
+    },
+    // Zenith: standard (defaults)
+    {
+      TOTALS_MATCH: { enabled: true, tolerance: 0.01, severity: "BLOCKER" as const },
+      REQUIRED_FIELDS_PRESENT: { enabled: true, severity: "BLOCKER" as const },
+      WORKING_DAYS_IN_RANGE: { enabled: true, minDays: 1, maxDays: 31, severity: "WARNING" as const },
+      NO_DUPLICATE_EMPLOYEE: { enabled: true, severity: "BLOCKER" as const },
+    },
+  ];
+
+  const dispatchConfigs = [
+    // Al Marwan: Email with CC
+    {
+      channel: "EMAIL",
+      format: "PDF",
+      sendCopyTo: [`finops@almarwan.com`, `accounts@almarwan.com`],
+    },
+    // Gulf Star: Webhook (stubbed)
+    {
+      channel: "WEBHOOK",
+      format: "JSON",
+      webhookUrl: "https://api.gulfstar.com/invoices/webhook",
+      webhookHeaders: { Authorization: "Bearer token123" },
+    },
+    // Zenith: SFTP (stubbed)
+    {
+      channel: "SFTP",
+      format: "PDF",
+      sftpConfig: {
+        host: "sftp.zenithrc.com",
+        port: 22,
+        username: "invoices",
+        password: "encrypted-password",
+        remotePath: "/invoices/2026-06",
+      },
+    },
+  ];
+
+  for (let i = 0; i < CLIENTS.length; i++) {
+    const c = CLIENTS[i];
     const client = await prisma.client.upsert({
       where: { code: c.code },
       update: {},
@@ -35,10 +88,48 @@ async function main() {
         city: c.city,
         industry: c.industry,
         contactEmail: `accounts@${c.code.toLowerCase()}.com`,
-        dispatchConfig: { sendCopyTo: [`finops@${c.code.toLowerCase()}.com`] },
+        dispatchConfig: dispatchConfigs[i],
+        validationRules: clientValidationRules[i],
       },
     });
     clients.push(client);
+  }
+
+  console.log("Seeding contracts...");
+  const contractMarkups = [
+    { clientIdx: 0, markup: 20, description: "Standard 20% markup" },
+    { clientIdx: 1, markup: 15, description: "Preferred partner 15% markup" },
+    { clientIdx: 2, markup: 25, description: "Premium 25% markup" },
+  ];
+  for (const contractData of contractMarkups) {
+    const client = clients[contractData.clientIdx];
+    await prisma.contract.deleteMany({
+      where: {
+        clientId: client.id,
+        NOT: {
+          validFrom: new Date("2026-06-01"),
+        },
+      },
+    });
+    await prisma.contract.upsert({
+      where: { clientId_validFrom: { clientId: client.id, validFrom: new Date("2026-06-01") } },
+      update: {
+        status: "ACTIVE",
+        validTo: null,
+        markupPercent: contractData.markup,
+      },
+      create: {
+        clientId: client.id,
+        billingModel: "MARKUP_PERCENT",
+        markupPercent: contractData.markup,
+        paymentTermsDays: 30,
+        currency: "AED",
+        validFrom: new Date("2026-06-01"),
+        validTo: null,
+        status: "ACTIVE",
+        description: contractData.description,
+      },
+    });
   }
 
   console.log("Seeding employees + payroll...");
@@ -126,7 +217,9 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "client@tia.demo" },
-    update: {},
+    update: {
+      clientId: clients[0].id,
+    },
     create: {
       email: "client@tia.demo",
       passwordHash,

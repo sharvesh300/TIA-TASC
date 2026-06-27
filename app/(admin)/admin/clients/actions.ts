@@ -3,8 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/require-role";
 import { createClient, updateClient } from "@/repositories/client.repo";
+import { createContractVersion } from "@/repositories/contract.repo";
+import { assignEmployeeToClient, unassignEmployeeFromClient } from "@/repositories/employee.repo";
 
 export type ClientFormState = { error?: string };
+export type ContractFormState = { error?: string };
+export type AssignFormState = { error?: string };
 
 function randomCode() {
   return `C-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -67,4 +71,58 @@ export async function toggleClientStatusAction(id: string, currentStatus: "ACTIV
   await requireRole(["ADMIN"]);
   await updateClient(id, { status: currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE" });
   revalidatePath("/admin/clients");
+}
+
+export async function createContractVersionAction(
+  _prevState: ContractFormState,
+  formData: FormData
+): Promise<ContractFormState> {
+  await requireRole(["ADMIN"]);
+
+  const clientId = formData.get("clientId") as string;
+  const markupPercent = Number(formData.get("markupPercent"));
+  const paymentTermsDays = Number(formData.get("paymentTermsDays"));
+  const currency = (formData.get("currency") as string) || "AED";
+  const description = (formData.get("description") as string) || undefined;
+  const validFromRaw = formData.get("validFrom") as string;
+  const validFrom = validFromRaw ? new Date(validFromRaw) : undefined;
+
+  if (!clientId || Number.isNaN(markupPercent) || markupPercent < 0) {
+    return { error: "A valid markup percentage is required." };
+  }
+  if (Number.isNaN(paymentTermsDays) || paymentTermsDays < 0) {
+    return { error: "A valid payment terms (days) is required." };
+  }
+
+  try {
+    await createContractVersion(clientId, {
+      markupPercent,
+      paymentTermsDays,
+      currency,
+      description,
+      validFrom,
+    });
+  } catch {
+    return { error: "Could not create contract version." };
+  }
+
+  revalidatePath(`/admin/clients/${clientId}`);
+  return {};
+}
+
+export async function assignEmployeeAction(clientId: string, employeeId: string) {
+  await requireRole(["ADMIN"]);
+  try {
+    await assignEmployeeToClient(employeeId, clientId);
+  } catch {
+    return { error: "Could not assign employee. The employee ID may already be in use for this client." };
+  }
+  revalidatePath(`/admin/clients/${clientId}`);
+  return {};
+}
+
+export async function unassignEmployeeAction(employeeId: string, clientId: string) {
+  await requireRole(["ADMIN"]);
+  await unassignEmployeeFromClient(employeeId);
+  revalidatePath(`/admin/clients/${clientId}`);
 }

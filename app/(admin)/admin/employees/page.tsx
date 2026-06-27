@@ -133,7 +133,13 @@ export default async function AdminEmployeesPage({
               <TableRow key={employee.id}>
                 <TableCell className="font-medium">{employee.fullName}</TableCell>
                 <TableCell className="font-mono text-xs">{employee.empId}</TableCell>
-                <TableCell>{employee.client.name}</TableCell>
+                <TableCell>
+                  {employee.client ? (
+                    employee.client.name
+                  ) : (
+                    <Badge variant="secondary">Unassigned</Badge>
+                  )}
+                </TableCell>
                 <TableCell>{employee.department ?? "—"}</TableCell>
                 <TableCell>{employee.jobTitle ?? "—"}</TableCell>
                 <TableCell>

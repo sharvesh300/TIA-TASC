@@ -127,7 +127,11 @@ export default async function AdminClientsPage({
             )}
             {rows.map((client) => (
               <TableRow key={client.id}>
-                <TableCell className="font-medium">{client.name}</TableCell>
+                <TableCell className="font-medium">
+                  <Link href={`/admin/clients/${client.id}`} className="hover:underline">
+                    {client.name}
+                  </Link>
+                </TableCell>
                 <TableCell className="font-mono text-xs">{client.code}</TableCell>
                 <TableCell>{client.city ?? "—"}</TableCell>
                 <TableCell>{client.industry ?? "—"}</TableCell>

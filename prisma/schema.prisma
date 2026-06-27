@@ -114,12 +114,14 @@ model Client {
   contactEmail   String?
   status         ClientStatus @default(ACTIVE)
   dispatchConfig Json?
+  validationRules Json?
 
   users         User[]
   employees     Employee[]
   pipelineJobs  PipelineJob[]
   extractedRows ExtractedRow[]
   invoices      Invoice[]
+  contracts     Contract[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -130,8 +132,8 @@ model Employee {
   empId         String
   fullName      String
   email         String?
-  clientId      String
-  client        Client         @relation(fields: [clientId], references: [id])
+  clientId      String?
+  client        Client?        @relation(fields: [clientId], references: [id])
   jobTitle      String?
   department    String?
   nationality   String?
@@ -227,12 +229,39 @@ model ExtractedRow {
   @@index([clientId])
 }
 
+model Contract {
+  id                String   @id @default(cuid())
+  clientId          String
+  client            Client   @relation(fields: [clientId], references: [id])
+
+  billingModel      String   @default("MARKUP_PERCENT")
+  markupPercent     Decimal  @default(0)
+  paymentTermsDays  Int      @default(30)
+  currency          String   @default("AED")
+
+  validFrom         DateTime
+  validTo           DateTime?
+  status            String   @default("ACTIVE")
+  description       String?
+
+  invoices          Invoice[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+  @@unique([clientId, validFrom])
+}
+
 model Invoice {
   id            String        @id @default(cuid())
   clientId      String
   client        Client        @relation(fields: [clientId], references: [id])
   pipelineJobId String?
   pipelineJob   PipelineJob?  @relation(fields: [pipelineJobId], references: [id])
+  contractId    String?
+  contract      Contract?     @relation(fields: [contractId], references: [id])
   payPeriod     String
   totalAmount   Decimal       @default(0)
   currency      String        @default("AED")
@@ -249,6 +278,7 @@ model Invoice {
   updatedAt DateTime @updatedAt
 
   @@index([clientId])
+  @@index([contractId])
   @@index([status])
   @@unique([clientId, payPeriod])
 }
@@ -265,6 +295,7 @@ model InvoiceLine {
   otAmount     Decimal   @default(0)
   deductions   Decimal   @default(0)
   netPay       Decimal   @default(0)
+  billedAmount Decimal   @default(0)
   workingDays  Decimal   @default(0)
 
   createdAt DateTime @default(now())

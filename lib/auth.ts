@@ -44,7 +44,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.sub as string;
         session.user.role = token.role as string;
-        session.user.clientId = token.clientId as string | null;
+        // Dynamically fetch current clientId from database to prevent stale IDs
+        // in session JWT after database resets or re-seeding.
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub as string },
+          select: { clientId: true },
+        });
+        session.user.clientId = dbUser?.clientId ?? (token.clientId as string | null);
       }
       return session;
     },

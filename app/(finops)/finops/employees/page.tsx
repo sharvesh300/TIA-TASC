@@ -127,7 +127,9 @@ export default async function FinOpsEmployeesPage({
               <TableRow key={employee.id} className="hover:bg-muted/50 transition-colors">
                 <TableCell className="font-medium">{employee.fullName}</TableCell>
                 <TableCell className="font-mono text-xs">{employee.empId}</TableCell>
-                <TableCell>{employee.client.name}</TableCell>
+                <TableCell>
+                  {employee.client ? employee.client.name : <Badge variant="secondary">Unassigned</Badge>}
+                </TableCell>
                 <TableCell>{employee.department ?? "—"}</TableCell>
                 <TableCell>{employee.jobTitle ?? "—"}</TableCell>
                 <TableCell>
