@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tia
+      POSTGRES_PASSWORD: tia
+      POSTGRES_DB: tia
+    ports:
+      - "5432:5432"
+    volumes:
+      - tia_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  tia_postgres_data:

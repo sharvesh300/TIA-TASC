@@ -1,0 +1,258 @@
+// TIA — Simplified MVP schema (architecture doc §4.1, simplifications in §4.3)
+// Refactored to mirror the official TASC sample database (Employees / Payroll_June2026 sheets)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  FINOPS
+  REVIEWER
+  CLIENT
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SourceChannel {
+  PORTAL
+  EMAIL
+  WEBHOOK
+}
+
+enum DocumentFormat {
+  XLSX
+  PDF
+  IMAGE
+  EMAIL
+}
+
+enum JobStatus {
+  UPLOADED
+  QUEUED
+  EXTRACTING
+  NEEDS_REVIEW
+  EXTRACTED
+  GENERATING_INVOICE
+  VALIDATING
+  READY_FOR_DISPATCH
+  DISPATCHED
+  FAILED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  VALIDATED
+  DISPATCHED
+  APPROVED
+  REJECTED
+  QUERIED
+}
+
+enum ValidationStatus {
+  PASS
+  WARNING
+  BLOCKER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Client {
+  id             String       @id @default(cuid())
+  code           String       @unique
+  name           String
+  city           String?
+  industry       String?
+  contactEmail   String?
+  status         ClientStatus @default(ACTIVE)
+  dispatchConfig Json?
+
+  users         User[]
+  employees     Employee[]
+  pipelineJobs  PipelineJob[]
+  extractedRows ExtractedRow[]
+  invoices      Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Employee {
+  id            String         @id @default(cuid())
+  empId         String
+  fullName      String
+  email         String?
+  clientId      String
+  client        Client         @relation(fields: [clientId], references: [id])
+  jobTitle      String?
+  department    String?
+  nationality   String?
+  dateOfJoining DateTime?
+  iban          String?
+  status        EmployeeStatus @default(ACTIVE)
+
+  payrolls      Payroll[]
+  invoiceLines  InvoiceLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, empId])
+  @@index([clientId])
+}
+
+model Payroll {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  payPeriod   String
+  basic       Decimal  @default(0)
+  housing     Decimal  @default(0)
+  transport   Decimal  @default(0)
+  food        Decimal  @default(0)
+  phone       Decimal  @default(0)
+  gross       Decimal  @default(0)
+  otHours     Decimal  @default(0)
+  otAmount    Decimal  @default(0)
+  deductions  Decimal  @default(0)
+  netPay      Decimal  @default(0)
+  currency    String   @default("AED")
+  workingDays Decimal  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([payPeriod])
+}
+
+model PipelineJob {
+  id            String         @id @default(cuid())
+  clientId      String
+  client        Client         @relation(fields: [clientId], references: [id])
+  sourceChannel SourceChannel
+  fileUrl       String
+  format        DocumentFormat
+  status        JobStatus      @default(UPLOADED)
+
+  originalFileName    String?
+  mimeType            String?
+  fileSize            Int?
+  processingStartedAt DateTime?
+  processingCompletedAt DateTime?
+
+  extractedRows ExtractedRow[]
+  invoices      Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([clientId])
+}
+
+model ExtractedRow {
+  id                String         @id @default(cuid())
+  jobId             String
+  job               PipelineJob    @relation(fields: [jobId], references: [id])
+  empId             String?
+  fullName          String
+  clientId          String
+  client            Client         @relation(fields: [clientId], references: [id])
+  payPeriod         String
+  workingDays       Decimal        @default(0)
+  otHours           Decimal        @default(0)
+  currency          String         @default("AED")
+  overallConfidence Decimal        @default(1)
+  sourceType        DocumentFormat
+  fieldsJson        Json?
+  rawData           Json?
+  humanVerified     Boolean        @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([clientId])
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id])
+  pipelineJobId String?
+  pipelineJob   PipelineJob?  @relation(fields: [pipelineJobId], references: [id])
+  payPeriod     String
+  totalAmount   Decimal       @default(0)
+  currency      String        @default("AED")
+  status        InvoiceStatus @default(DRAFT)
+  pdfUrl        String?
+  dispatchedAt  DateTime?
+  lines         InvoiceLine[]
+  validations   ValidationResult[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+  @@unique([clientId, payPeriod])
+}
+
+model InvoiceLine {
+  id           String    @id @default(cuid())
+  invoiceId    String
+  invoice      Invoice   @relation(fields: [invoiceId], references: [id])
+  employeeId   String?
+  employee     Employee? @relation(fields: [employeeId], references: [id])
+  empId        String
+  employeeName String
+  gross        Decimal   @default(0)
+  otAmount     Decimal   @default(0)
+  deductions   Decimal   @default(0)
+  netPay       Decimal   @default(0)
+  workingDays  Decimal   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ValidationResult {
+  id             String            @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice           @relation(fields: [invoiceId], references: [id])
+  ruleCode       String
+  ruleLabel      String
+  status         ValidationStatus
+  expected       String?
+  actual         String?
+  resolvedBy     String?
+  resolutionNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId])
+}
