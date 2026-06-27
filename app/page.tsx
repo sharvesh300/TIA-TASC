@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { LandingPage } from "@/components/landing/landing-page";
 
 const ROLE_HOME: Record<string, string> = {
   ADMIN: "/admin",
@@ -10,5 +11,8 @@ const ROLE_HOME: Record<string, string> = {
 
 export default async function Home() {
   const session = await auth();
-  redirect(ROLE_HOME[session?.user.role ?? ""] ?? "/login");
+  if (session?.user) {
+    redirect(ROLE_HOME[session.user.role] ?? "/login");
+  }
+  return <LandingPage />;
 }

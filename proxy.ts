@@ -4,8 +4,9 @@ import { auth } from "@/lib/auth";
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isLoginPage = req.nextUrl.pathname === "/login";
+  const isPublicPage = req.nextUrl.pathname === "/";
 
-  if (!isLoggedIn && !isLoginPage) {
+  if (!isLoggedIn && !isLoginPage && !isPublicPage) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
