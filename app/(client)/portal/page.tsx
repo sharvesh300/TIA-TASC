@@ -1,7 +1,185 @@
-export default function ClientPortalPage() {
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { JobStatusBadge } from "@/components/pipeline/job-status-badge";
+import { requireRole } from "@/lib/require-role";
+import { listJobsByClient } from "@/repositories/job.repo";
+import { listInvoicesByClient } from "@/repositories/invoice.repo";
+import { UploadForm } from "./upload-form";
+import { CloudUpload, CheckCircle, Clock, CreditCard } from "lucide-react";
+
+export default async function ClientPortalPage() {
+  const session = await requireRole(["CLIENT", "ADMIN"]);
+  const clientId = session.user.clientId;
+
+  if (!clientId) {
+    return (
+      <div className="space-y-4">
+        <h1 className="font-heading text-2xl font-semibold">Portal</h1>
+        <p className="text-sm text-muted-foreground">
+          Your account is not linked to a client organization, so there are no timesheets to show.
+        </p>
+      </div>
+    );
+  }
+
+  const jobs = await listJobsByClient(clientId);
+  const invoices = await listInvoicesByClient(clientId);
+
+  const totalTimesheets = jobs.length;
+  const approvedInvoicesCount = invoices.filter((inv) => inv.status === "APPROVED" || inv.status === "DISPATCHED").length;
+  const pendingActionCount = invoices.filter((inv) => inv.status === "DRAFT" || inv.status === "VALIDATED").length;
+  const totalBilledAmount = invoices
+    .filter((inv) => inv.status === "APPROVED" || inv.status === "DISPATCHED")
+    .reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+
   return (
-    <main className="p-8">
-      <h1 className="text-xl font-semibold">Client Portal — Upload &amp; Invoices</h1>
-    </main>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2">
+        <h1 className="font-heading text-3xl font-bold tracking-tight bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600 bg-clip-text text-transparent dark:from-teal-400 dark:via-emerald-400 dark:to-green-400">
+          Client Timesheet &amp; Invoice Portal
+        </h1>
+        <p className="text-sm text-muted-foreground max-w-2xl">
+          Upload timesheets and track invoice extraction, validation, and approval status in real time.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="hover:shadow-md transition-all duration-300 hover:border-teal-500/50 group/card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Timesheets Sent</CardTitle>
+              <CardDescription>Total uploaded files</CardDescription>
+            </div>
+            <div className="p-2 rounded-lg bg-teal-500/10 text-teal-500 group-hover/card:bg-teal-500 group-hover/card:text-white transition-all duration-300">
+              <CloudUpload className="size-5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold font-heading">{totalTimesheets}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-all duration-300 hover:border-emerald-500/50 group/card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Approved Invoices</CardTitle>
+              <CardDescription>Ready for billing</CardDescription>
+            </div>
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 group-hover/card:bg-emerald-500 group-hover/card:text-white transition-all duration-300">
+              <CheckCircle className="size-5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold font-heading text-emerald-500">{approvedInvoicesCount}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-all duration-300 hover:border-amber-500/50 group/card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pending Action</CardTitle>
+              <CardDescription>Awaiting review</CardDescription>
+            </div>
+            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 group-hover/card:bg-amber-500 group-hover/card:text-white transition-all duration-300">
+              <Clock className="size-5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold font-heading text-amber-500">{pendingActionCount}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-all duration-300 hover:border-green-500/50 group/card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Billed Amount</CardTitle>
+              <CardDescription>Approved sum</CardDescription>
+            </div>
+            <div className="p-2 rounded-lg bg-green-500/10 text-green-500 group-hover/card:bg-green-500 group-hover/card:text-white transition-all duration-300">
+              <CreditCard className="size-5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-heading text-green-600 dark:text-green-400">
+              AED {totalBilledAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="md:col-span-1">
+          <Card className="h-full border shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Submit Timesheet</CardTitle>
+              <CardDescription>Upload a new timesheet document to trigger automated extraction and invoice generation.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <UploadForm />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="md:col-span-2">
+          <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden h-full flex flex-col">
+            <div className="p-6 pb-4 border-b">
+              <h2 className="font-heading text-lg font-semibold">Upload History &amp; Pipeline Status</h2>
+              <p className="text-xs text-muted-foreground">View details of your uploaded timesheets and their corresponding invoice status.</p>
+            </div>
+            <div className="p-6 flex-1 overflow-auto">
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="font-semibold">File</TableHead>
+                      <TableHead className="font-semibold">Format</TableHead>
+                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="font-semibold">Invoice</TableHead>
+                      <TableHead className="font-semibold">Uploaded</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobs.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
+                          No timesheets uploaded yet.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {jobs.map((job) => {
+                      const invoice = job.invoices[0];
+                      return (
+                        <TableRow key={job.id} className="hover:bg-muted/50 transition-colors">
+                          <TableCell className="font-medium font-mono text-xs max-w-[200px] truncate">
+                            {job.originalFileName ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-xs font-mono">{job.format}</TableCell>
+                          <TableCell>
+                            <JobStatusBadge status={job.status} />
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-xs">
+                            {invoice ? `${invoice.currency} ${Number(invoice.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })} · ${invoice.status}` : "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-xs">
+                            {job.createdAt.toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

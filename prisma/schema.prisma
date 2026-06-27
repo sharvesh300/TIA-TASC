@@ -68,6 +68,32 @@ enum ValidationStatus {
   BLOCKER
 }
 
+enum ExtractionEngine {
+  NONE
+  EXCEL
+  TESSERACT
+  GPT4O
+}
+
+enum PipelineEventType {
+  INGESTED
+  EXTRACTION_STARTED
+  EXTRACTION_COMPLETED
+  ESCALATED_TO_GPT
+  FLAGGED_FOR_REVIEW
+  REVIEW_RESOLVED
+  INVOICE_GENERATED
+  VALIDATION_RUN
+  DISPATCHED
+  FAILED
+}
+
+enum EventActor {
+  SYSTEM
+  AI
+  USER
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -156,6 +182,8 @@ model PipelineJob {
   fileUrl       String
   format        DocumentFormat
   status        JobStatus      @default(UPLOADED)
+  engineUsed    ExtractionEngine @default(NONE)
+  failureReason String?
 
   originalFileName    String?
   mimeType            String?
@@ -165,6 +193,7 @@ model PipelineJob {
 
   extractedRows ExtractedRow[]
   invoices      Invoice[]
+  events        PipelineEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -210,6 +239,9 @@ model Invoice {
   status        InvoiceStatus @default(DRAFT)
   pdfUrl        String?
   dispatchedAt  DateTime?
+  approvedBy    String?
+  approvedAt    DateTime?
+  rejectionNote String?
   lines         InvoiceLine[]
   validations   ValidationResult[]
 
@@ -237,6 +269,24 @@ model InvoiceLine {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model PipelineEvent {
+  id         String            @id @default(cuid())
+  jobId      String
+  job        PipelineJob       @relation(fields: [jobId], references: [id])
+  type       PipelineEventType
+  fromStatus JobStatus?
+  toStatus   JobStatus?
+  actor      EventActor        @default(SYSTEM)
+  actorId    String?
+  message    String?
+  confidence Decimal?
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
 }
 
 model ValidationResult {

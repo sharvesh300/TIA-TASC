@@ -1,8 +1,12 @@
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, FileText, Users } from "lucide-react";
 import { requireRole } from "@/lib/require-role";
 import { DashboardShell } from "@/components/shell/dashboard-shell";
 
-const nav = [{ label: "Dashboard", href: "/portal", icon: LayoutDashboard }];
+const nav = [
+  { label: "Upload Portal", href: "/portal", icon: LayoutDashboard },
+  { label: "Invoices", href: "/portal/invoices", icon: FileText },
+  { label: "Employees", href: "/portal/employees", icon: Users },
+];
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
   const session = await requireRole(["CLIENT", "ADMIN"]);
