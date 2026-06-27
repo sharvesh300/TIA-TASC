@@ -9,6 +9,18 @@ export function getEmployeeByClientAndEmpId(clientId: string, empId: string) {
   return prisma.employee.findUnique({ where: { clientId_empId: { clientId, empId } } });
 }
 
+export function findEmployeesByClientAndName(clientId: string, fullName: string) {
+  return prisma.employee.findMany({
+    where: {
+      clientId,
+      fullName: {
+        equals: fullName,
+        mode: "insensitive",
+      },
+    },
+  });
+}
+
 export function getEmployeeById(id: string) {
   return prisma.employee.findUnique({ where: { id } });
 }

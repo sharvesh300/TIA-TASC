@@ -44,3 +44,4 @@ next-env.d.ts
 
 # local pipeline file storage (uploaded timesheets, generated invoice PDFs)
 /storage
+bun.lock
