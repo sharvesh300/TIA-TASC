@@ -19,6 +19,7 @@ import { requireRole } from "@/lib/require-role";
 import { getJobWithRelations } from "@/repositories/job.repo";
 import { ReviewEditor } from "../review-editor";
 import { JobActions } from "../job-actions";
+import { ErpExportButton } from "../erp-export-button";
 
 export default async function FinOpsJobPage({
   params,
