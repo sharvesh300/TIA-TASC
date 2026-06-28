@@ -1,10 +1,10 @@
 import ExcelJS from "exceljs";
-import type { CanonicalRow, ExtractionResult } from "@/types/extraction";
+import type { CanonicalRow, ExtractionContext, ExtractionResult } from "@/types/extraction";
 import { buildRow, mapHeaders } from "@/agents/_shared";
 
 // Structured extraction from .xlsx. No OCR needed — we read cells directly and
 // tolerate messy headers. Confidence reflects required-field completeness.
-export async function extractExcel(buffer: Buffer): Promise<ExtractionResult> {
+export async function extractExcel(buffer: Buffer, ctx?: ExtractionContext): Promise<ExtractionResult> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer as unknown as ArrayBuffer);
   const ws = wb.worksheets[0];
@@ -42,7 +42,7 @@ export async function extractExcel(buffer: Buffer): Promise<ExtractionResult> {
     }
     if (Object.keys(record).length === 0) continue;
 
-    const { row, confidence } = buildRow(record, 1);
+    const { row, confidence } = buildRow(record, 1, ctx?.standardHoursPerShift);
     rows.push(row);
     confidences.push(confidence);
   }

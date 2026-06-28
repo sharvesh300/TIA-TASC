@@ -78,6 +78,7 @@ export default async function ClientDetailPage({
             clientId={client.id}
             defaultCurrency={latestContract?.currency}
             defaultWorkRules={latestWorkRules}
+            defaultBillingPeriodType={latestContract?.billingPeriodType}
           />
         </CardHeader>
         <CardContent>
@@ -89,6 +90,7 @@ export default async function ClientDetailPage({
                 <TableHead>Markup %</TableHead>
                 <TableHead>Payment terms</TableHead>
                 <TableHead>Currency</TableHead>
+                <TableHead>Billing period</TableHead>
                 <TableHead>Overtime</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Description</TableHead>
@@ -97,7 +99,7 @@ export default async function ClientDetailPage({
             <TableBody>
               {contracts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                     No contracts yet.
                   </TableCell>
                 </TableRow>
@@ -113,6 +115,7 @@ export default async function ClientDetailPage({
                     <TableCell>{Number(contract.markupPercent)}%</TableCell>
                     <TableCell>{contract.paymentTermsDays} days</TableCell>
                     <TableCell>{contract.currency}</TableCell>
+                    <TableCell className="text-muted-foreground">{contract.billingPeriodType}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {wr.overtimeAllowed
                         ? `Allowed, ${wr.overtimeMultiplier}x (≤${wr.maxOvertimeHoursPerDay}h/day)`

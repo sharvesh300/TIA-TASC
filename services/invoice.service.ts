@@ -4,6 +4,7 @@
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_CURRENCY, DEFAULT_PAY_PERIOD } from "@/agents/_shared";
+import { periodToDate } from "@/lib/constants";
 import { getJobWithRelations, listExtractedRowsByClientPeriod } from "@/repositories/job.repo";
 import { getPayroll } from "@/repositories/payroll.repo";
 import { createInvoice, getInvoiceByClientPeriod } from "@/repositories/invoice.repo";
@@ -36,7 +37,7 @@ export async function generateInvoice(jobId: string, actorId?: string | null) {
   // Load active contract for this client at the pay period date. Missing
   // contract is a fixable setup issue, not a hard failure — bounce the job
   // back to NEEDS_REVIEW so it surfaces in the inbox instead of FAILED.
-  const payPeriodDate = new Date(`${payPeriod}-01`);
+  const payPeriodDate = periodToDate(payPeriod);
   const contract = await getActiveContract(job.clientId, payPeriodDate);
   if (!contract) {
     await transition(jobId, "NEEDS_REVIEW", {

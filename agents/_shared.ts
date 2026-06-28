@@ -1,13 +1,22 @@
 // Shared helpers for turning raw extracted data (spreadsheet rows or OCR text)
 // into CanonicalRow[] with a confidence estimate. Header matching is tolerant of
 // case, whitespace, and common synonyms so "messy" sheets still parse.
-import type { CanonicalRow } from "@/types/extraction";
+import type { CanonicalRow, ExtractionContext } from "@/types/extraction";
+import { hoursToDays, periodKeyFor } from "@/lib/constants";
 
 // Must match the seeded Payroll.payPeriod so invoice generation can join payroll.
 export const DEFAULT_PAY_PERIOD = "2026-06";
 export const DEFAULT_CURRENCY = "AED";
 
-type CanonicalField = "empId" | "fullName" | "payPeriod" | "workingDays" | "otHours" | "currency";
+type CanonicalField =
+  | "empId"
+  | "fullName"
+  | "payPeriod"
+  | "workingDays"
+  | "otHours"
+  | "currency"
+  | "hoursWorked"
+  | "date";
 
 const HEADER_SYNONYMS: Record<CanonicalField, string[]> = {
   empId: ["empid", "employeeid", "empno", "employeeno", "staffid", "id", "employeecode"],
@@ -16,6 +25,10 @@ const HEADER_SYNONYMS: Record<CanonicalField, string[]> = {
   workingDays: ["workingdays", "days", "daysworked", "workdays", "noofdays"],
   otHours: ["othours", "overtimehours", "overtime", "ot", "othrs"],
   currency: ["currency", "ccy", "curr"],
+  // Some sources report hours worked instead of days (e.g. a weekly "Week 1 –
+  // 8 hrs" column) — converted to days in buildRow via standardHoursPerShift.
+  hoursWorked: ["hoursworked", "totalhours", "hours", "hrs"],
+  date: ["date", "day", "workdate", "attendancedate"],
 };
 
 export function normalizeHeader(raw: string): string {
@@ -40,21 +53,33 @@ export function mapHeaders(headerCells: string[]): Partial<Record<number, Canoni
 const REQUIRED_FIELDS: CanonicalField[] = ["empId", "fullName", "workingDays"];
 
 /** Build a CanonicalRow from a field→value record, returning a 0–1 confidence
- * based on how many required fields are present and well-formed. */
+ * based on how many required fields are present and well-formed.
+ * `standardHoursPerShift` converts an hours-denominated source (no
+ * `workingDays` but a `hoursWorked` column) into days. */
 export function buildRow(
   record: Partial<Record<CanonicalField, string | number>>,
-  baseConfidence = 1
+  baseConfidence = 1,
+  standardHoursPerShift = 8
 ): { row: CanonicalRow; confidence: number } {
   const fullName = String(record.fullName ?? "").trim();
   const empId = record.empId != null ? String(record.empId).trim() : undefined;
-  const workingDays = toNumber(record.workingDays);
+  let workingDays = toNumber(record.workingDays);
   const otHours = toNumber(record.otHours);
+  const hoursWorked = toNumber(record.hoursWorked);
+  const hasWorkingDays = record.workingDays != null && !Number.isNaN(workingDays);
+  const hasHoursWorked = !hasWorkingDays && record.hoursWorked != null && !Number.isNaN(hoursWorked);
+
+  if (hasHoursWorked) {
+    workingDays = hoursToDays(hoursWorked, standardHoursPerShift);
+  }
 
   let present = 0;
   if (empId) present++;
   if (fullName) present++;
-  if (record.workingDays != null && !Number.isNaN(workingDays)) present++;
+  if (hasWorkingDays || hasHoursWorked) present++;
   const completeness = present / REQUIRED_FIELDS.length;
+
+  const date = record.date != null ? String(record.date).trim() : undefined;
 
   const row: CanonicalRow = {
     empId,
@@ -63,10 +88,38 @@ export function buildRow(
     workingDays: Number.isNaN(workingDays) ? 0 : workingDays,
     otHours: Number.isNaN(otHours) ? 0 : otHours,
     currency: String(record.currency ?? DEFAULT_CURRENCY),
+    date: date || undefined,
     rawData: record as Record<string, unknown>,
   };
 
   return { row, confidence: baseConfidence * completeness };
+}
+
+/** Roll source rows up to the contract's billing cadence. Rows carrying an
+ * explicit per-day `date` are bucketed by that cadence's period key (so a
+ * WEEKLY contract gets one row per ISO week even from a daily-rows file);
+ * rows with no date (already a period total) collapse onto the job's
+ * canonical period. Same-employee, same-period rows are summed rather than
+ * left as duplicates — this is what makes daily/weekly source files behave
+ * correctly under a monthly (or any other) contract cadence. */
+export function normalizeRowsToPeriod(rows: CanonicalRow[], ctx: ExtractionContext): CanonicalRow[] {
+  const byKey = new Map<string, CanonicalRow>();
+
+  for (const r of rows) {
+    const periodKey = r.date ? periodKeyFor(new Date(r.date), ctx.billingPeriodType) : ctx.defaultPayPeriod;
+    const empKey = r.empId || r.fullName;
+    const key = `${empKey}::${periodKey}`;
+
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.workingDays += r.workingDays;
+      existing.otHours += r.otHours;
+    } else {
+      byKey.set(key, { ...r, payPeriod: periodKey, date: undefined });
+    }
+  }
+
+  return [...byKey.values()];
 }
 
 function toNumber(value: unknown): number {

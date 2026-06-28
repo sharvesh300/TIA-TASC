@@ -75,6 +75,13 @@ enum ExtractionEngine {
   GPT4O
 }
 
+enum BillingPeriodType {
+  MONTHLY
+  WEEKLY
+  BIWEEKLY
+  DAILY
+}
+
 enum PipelineEventType {
   INGESTED
   EXTRACTION_STARTED
@@ -238,6 +245,7 @@ model Contract {
   client            Client   @relation(fields: [clientId], references: [id])
 
   billingModel      String   @default("MARKUP_PERCENT")
+  billingPeriodType BillingPeriodType @default(MONTHLY)
   markupPercent     Decimal  @default(0)
   paymentTermsDays  Int      @default(30)
   currency          String   @default("AED")

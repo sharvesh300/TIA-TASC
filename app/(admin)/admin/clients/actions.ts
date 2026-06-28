@@ -93,6 +93,12 @@ export async function createContractVersionAction(
   const description = (formData.get("description") as string) || undefined;
   const validFromRaw = formData.get("validFrom") as string;
   const validFrom = validFromRaw ? new Date(validFromRaw) : undefined;
+  const billingPeriodTypeRaw = formData.get("billingPeriodType") as string;
+  const billingPeriodType = (["MONTHLY", "WEEKLY", "BIWEEKLY", "DAILY"] as const).includes(
+    billingPeriodTypeRaw as never
+  )
+    ? (billingPeriodTypeRaw as "MONTHLY" | "WEEKLY" | "BIWEEKLY" | "DAILY")
+    : "MONTHLY";
 
   if (!clientId || Number.isNaN(markupPercent) || markupPercent < 0) {
     return { error: "A valid markup percentage is required." };
@@ -128,6 +134,7 @@ export async function createContractVersionAction(
       description,
       validFrom,
       workRules: workRules as unknown as Prisma.InputJsonValue,
+      billingPeriodType,
     });
   } catch {
     return { error: "Could not create contract version." };

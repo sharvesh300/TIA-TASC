@@ -15,8 +15,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createContractVersionAction, type ContractFormState } from "../actions";
 import { DEFAULT_CONTRACT_WORK_RULES, type ContractWorkRulesConfig } from "@/lib/constants";
+
+const BILLING_PERIOD_OPTIONS = [
+  { value: "MONTHLY", label: "Monthly" },
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "BIWEEKLY", label: "Biweekly" },
+  { value: "DAILY", label: "Daily" },
+] as const;
 
 const initialState: ContractFormState = {};
 
@@ -33,14 +47,17 @@ export function NewContractDialog({
   clientId,
   defaultCurrency,
   defaultWorkRules,
+  defaultBillingPeriodType,
 }: {
   clientId: string;
   defaultCurrency?: string;
   defaultWorkRules?: ContractWorkRulesConfig | null;
+  defaultBillingPeriodType?: "MONTHLY" | "WEEKLY" | "BIWEEKLY" | "DAILY";
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createContractVersionAction, initialState);
   const wasPending = useRef(false);
+  const [billingPeriodType, setBillingPeriodType] = useState(defaultBillingPeriodType ?? "MONTHLY");
 
   useEffect(() => {
     if (wasPending.current && !pending && !state.error) {
@@ -96,6 +113,22 @@ export function NewContractDialog({
                 <div className="space-y-1.5">
                   <Label htmlFor="validFrom">Valid from</Label>
                   <Input id="validFrom" name="validFrom" type="date" defaultValue={today} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="billingPeriodType">Billing period</Label>
+                  <input type="hidden" name="billingPeriodType" value={billingPeriodType} />
+                  <Select value={billingPeriodType} onValueChange={(v) => setBillingPeriodType(v as typeof billingPeriodType)}>
+                    <SelectTrigger id="billingPeriodType" className="w-full" size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BILLING_PERIOD_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="description">Description</Label>

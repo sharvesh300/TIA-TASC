@@ -45,6 +45,7 @@ export async function updateContract(
     description?: string;
     validFrom?: Date;
     workRules?: Prisma.InputJsonValue | null;
+    billingPeriodType?: "MONTHLY" | "WEEKLY" | "BIWEEKLY" | "DAILY";
   }
 ) {
   const current = await getContractById(id);
@@ -72,6 +73,7 @@ export async function updateContract(
         data.workRules !== undefined
           ? data.workRules ?? Prisma.JsonNull
           : (current.workRules as Prisma.InputJsonValue | undefined) ?? undefined,
+      billingPeriodType: data.billingPeriodType ?? current.billingPeriodType,
       validFrom: data.validFrom || new Date(),
       validTo: null,
       status: "ACTIVE",
@@ -93,6 +95,7 @@ export async function createContractVersion(
     description?: string;
     validFrom?: Date;
     workRules?: Prisma.InputJsonValue | null;
+    billingPeriodType?: "MONTHLY" | "WEEKLY" | "BIWEEKLY" | "DAILY";
   }
 ) {
   const validFrom = data.validFrom || new Date();
@@ -109,6 +112,7 @@ export async function createContractVersion(
       description: data.description,
       validFrom,
       workRules: data.workRules,
+      billingPeriodType: data.billingPeriodType,
     });
   }
 
@@ -121,6 +125,7 @@ export async function createContractVersion(
       currency: data.currency,
       description: data.description,
       workRules: data.workRules ?? undefined,
+      billingPeriodType: data.billingPeriodType ?? "MONTHLY",
       validFrom,
       validTo: null,
       status: "ACTIVE",

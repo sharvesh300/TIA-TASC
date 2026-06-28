@@ -1,9 +1,9 @@
-import type { CanonicalRow, ExtractionResult } from "@/types/extraction";
+import type { CanonicalRow, ExtractionContext, ExtractionResult } from "@/types/extraction";
 import { buildRow, mapHeaders } from "@/agents/_shared";
 
 // Structured extraction from .csv. Same tolerant header-matching as the Excel
 // path — just split on lines/commas instead of reading worksheet cells.
-export async function extractCsv(buffer: Buffer): Promise<ExtractionResult> {
+export async function extractCsv(buffer: Buffer, ctx?: ExtractionContext): Promise<ExtractionResult> {
   const text = buffer.toString("utf-8");
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
   if (lines.length === 0) return { rows: [], overallConfidence: 0 };
@@ -39,7 +39,7 @@ export async function extractCsv(buffer: Buffer): Promise<ExtractionResult> {
     }
     if (Object.keys(record).length === 0) continue;
 
-    const { row, confidence } = buildRow(record, 1);
+    const { row, confidence } = buildRow(record, 1, ctx?.standardHoursPerShift);
     rows.push(row);
     confidences.push(confidence);
   }

@@ -6,6 +6,7 @@ import {
   VALIDATION_RULE_CODES,
   DEFAULT_VALIDATION_RULES,
   DEFAULT_CONTRACT_WORK_RULES,
+  expectedDayRange,
   type ClientValidationRulesConfig,
   type ContractWorkRulesConfig,
 } from "@/lib/constants";
@@ -37,6 +38,17 @@ export async function runValidations(invoiceId: string, actorId?: string | null)
   const lines = invoice.lines;
   const outcomes: RuleOutcome[] = [];
 
+  // Contract-side work rules (overtime/worktime governance, billing cadence).
+  // Loaded up front so both the period-aware day-range rule (#3) and the
+  // overtime rules (#5-7) below can reference it.
+  const contract = invoice.contractId
+    ? await prisma.contract.findUnique({ where: { id: invoice.contractId } })
+    : null;
+  const workRules: ContractWorkRulesConfig = contract?.workRules
+    ? JSON.parse(JSON.stringify(contract.workRules))
+    : DEFAULT_CONTRACT_WORK_RULES;
+  const workRuleValidation = workRules.validation ?? DEFAULT_CONTRACT_WORK_RULES.validation!;
+
   // 1. Totals match: invoice total equals the sum of line billed amounts.
   const totalsMatcher = clientRules.TOTALS_MATCH;
   if (totalsMatcher?.enabled !== false) {
@@ -67,11 +79,15 @@ export async function runValidations(invoiceId: string, actorId?: string | null)
     });
   }
 
-  // 3. Working days in range: configured per client.
+  // 3. Working days in range: configured per client, falling back to the
+  // contract's billing cadence (e.g. a weekly contract expects 1-7 days, not
+  // the monthly 1-31) when the client hasn't explicitly set minDays/maxDays.
   const daysMatcher = clientRules.WORKING_DAYS_IN_RANGE;
   if (daysMatcher?.enabled !== false) {
-    const minDays = daysMatcher?.minDays ?? 1;
-    const maxDays = daysMatcher?.maxDays ?? 31;
+    const rawDaysMatcher = (client.validationRules as ClientValidationRulesConfig | null)?.WORKING_DAYS_IN_RANGE;
+    const cadenceRange = expectedDayRange(contract?.billingPeriodType ?? "MONTHLY");
+    const minDays = rawDaysMatcher?.minDays ?? cadenceRange.minDays;
+    const maxDays = rawDaysMatcher?.maxDays ?? cadenceRange.maxDays;
     const severity = daysMatcher?.severity ?? "WARNING";
     const outOfRange = lines.filter((l) => {
       const d = Number(l.workingDays);
@@ -101,18 +117,6 @@ export async function runValidations(invoiceId: string, actorId?: string | null)
       actual: `${duplicates} duplicated employee id(s)`,
     });
   }
-
-  // Contract-side work rules (overtime/worktime governance). These come from
-  // the contract attached to the invoice at generation time; if there's no
-  // contract or no workRules configured, fall back to sane defaults rather
-  // than skipping the checks outright.
-  const contract = invoice.contractId
-    ? await prisma.contract.findUnique({ where: { id: invoice.contractId } })
-    : null;
-  const workRules: ContractWorkRulesConfig = contract?.workRules
-    ? JSON.parse(JSON.stringify(contract.workRules))
-    : DEFAULT_CONTRACT_WORK_RULES;
-  const workRuleValidation = workRules.validation ?? DEFAULT_CONTRACT_WORK_RULES.validation!;
 
   // 5. Overtime present despite the contract not allowing it.
   const otNotAllowedMatcher = workRuleValidation.OVERTIME_NOT_ALLOWED_BUT_PRESENT;
