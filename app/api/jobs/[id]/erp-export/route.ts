@@ -5,15 +5,15 @@ import { buildErpExcel, erpExportFilename } from "@/lib/erp-export";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   await requireRole(["FINOPS", "ADMIN"]);
 
-  const { jobId } = await params;
+  const { id } = await params;
 
   // Only allow export when extraction is complete
   const job = await prisma.pipelineJob.findUnique({
-    where: { id: jobId },
+    where: { id },
     select: { status: true, client: { select: { code: true } }, extractedRows: { select: { payPeriod: true } } },
   });
 
@@ -37,11 +37,11 @@ export async function GET(
   }
 
   try {
-    const buffer = await buildErpExcel(jobId);
+    const buffer = await buildErpExcel(id);
     const payPeriod = job.extractedRows[0]?.payPeriod ?? "unknown";
     const filename = erpExportFilename(job.client.code, payPeriod);
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type":
