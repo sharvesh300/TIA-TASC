@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileText } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { JobStatusBadge } from "@/components/pipeline/job-status-badge";
 import { EventTimeline } from "@/components/pipeline/event-timeline";
+import { DocumentViewer } from "@/components/pipeline/document-viewer";
 import { requireRole } from "@/lib/require-role";
 import { getJobWithRelations } from "@/repositories/job.repo";
 import { ReviewEditor } from "../review-editor";
@@ -53,6 +55,14 @@ export default async function FinOpsJobPage({
         </div>
         <div className="flex items-center gap-2">
           <JobStatusBadge status={job.status} />
+          {job.fileUrl && (
+            <Button asChild size="sm" variant="outline">
+              <a href={`/api/jobs/${job.id}/file`} target="_blank" rel="noopener noreferrer">
+                <FileText />
+                View document
+              </a>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -68,6 +78,21 @@ export default async function FinOpsJobPage({
         invoiceId={invoice?.id}
         invoiceStatus={invoice?.status}
       />
+
+      {job.fileUrl && (job.format === "IMAGE" || job.format === "PDF") && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Source document</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DocumentViewer
+              src={`/api/jobs/${job.id}/file`}
+              fileName={job.originalFileName ?? "Uploaded timesheet"}
+              format={job.format}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

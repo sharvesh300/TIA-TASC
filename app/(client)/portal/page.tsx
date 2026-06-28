@@ -107,7 +107,18 @@ export default async function ClientPortalPage() {
                       return (
                         <TableRow key={job.id} className="hover:bg-muted/50 transition-colors">
                           <TableCell className="font-medium font-mono text-xs max-w-[200px] truncate">
-                            {job.originalFileName ?? "—"}
+                            {job.fileUrl ? (
+                              <a
+                                href={`/api/jobs/${job.id}/file`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-foreground"
+                              >
+                                {job.originalFileName ?? "View document"}
+                              </a>
+                            ) : (
+                              job.originalFileName ?? "—"
+                            )}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-xs font-mono">{job.format}</TableCell>
                           <TableCell>

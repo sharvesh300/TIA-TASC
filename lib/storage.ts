@@ -1,39 +1,56 @@
-// Local filesystem storage helper. No cloud object store is configured for the
-// MVP, so uploaded timesheets and generated invoice PDFs live under ./storage.
-// Stored paths are relative (e.g. "uploads/<jobId>/file.xlsx") and saved on the
-// PipelineJob.fileUrl / Invoice.pdfUrl columns.
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+// Object storage helper backed by MinIO (S3-compatible). Uploaded timesheets
+// and generated invoice PDFs live in a single bucket under stable object keys
+// (e.g. "uploads/<jobId>/file.xlsx"), stored verbatim on PipelineJob.fileUrl /
+// Invoice.pdfUrl. The bucket is created on first use if it doesn't exist yet.
+import { Client } from "minio";
 import path from "node:path";
 
-const STORAGE_ROOT = path.join(process.cwd(), "storage");
+const MINIO_BUCKET = process.env.MINIO_BUCKET || "tia-tasc";
 
-function resolveSafe(relativePath: string): string {
-  const full = path.join(STORAGE_ROOT, relativePath);
-  if (!full.startsWith(STORAGE_ROOT)) {
-    throw new Error("Invalid storage path");
+const minioClient = new Client({
+  endPoint: process.env.MINIO_ENDPOINT || "localhost",
+  port: Number(process.env.MINIO_PORT) || 9000,
+  useSSL: process.env.MINIO_USE_SSL === "true",
+  accessKey: process.env.MINIO_ACCESS_KEY || "tia",
+  secretKey: process.env.MINIO_SECRET_KEY || "tia12345",
+});
+
+let bucketReady: Promise<void> | null = null;
+
+function ensureBucket(): Promise<void> {
+  if (!bucketReady) {
+    bucketReady = minioClient.bucketExists(MINIO_BUCKET).then((exists) => {
+      if (!exists) return minioClient.makeBucket(MINIO_BUCKET);
+    });
   }
-  return full;
+  return bucketReady;
 }
 
-/** Persist bytes under storage/<relativePath>, creating parent dirs. Returns the relative path. */
-export async function saveFile(relativePath: string, data: Buffer | Uint8Array): Promise<string> {
-  const full = resolveSafe(relativePath);
-  await mkdir(path.dirname(full), { recursive: true });
-  await writeFile(full, data);
-  return relativePath;
+/** Persist bytes under the given object key. Returns the key as stored. */
+export async function saveFile(objectKey: string, data: Buffer | Uint8Array): Promise<string> {
+  await ensureBucket();
+  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  await minioClient.putObject(MINIO_BUCKET, objectKey, buffer, buffer.length);
+  return objectKey;
 }
 
-/** Read bytes for a previously stored relative path. */
-export async function readStoredFile(relativePath: string): Promise<Buffer> {
-  return readFile(resolveSafe(relativePath));
+/** Read bytes for a previously stored object key. */
+export async function readStoredFile(objectKey: string): Promise<Buffer> {
+  await ensureBucket();
+  const stream = await minioClient.getObject(MINIO_BUCKET, objectKey);
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks);
 }
 
 export function uploadPath(jobId: string, fileName: string): string {
   // Strip any directory components from the original file name.
   const safeName = path.basename(fileName);
-  return path.join("uploads", jobId, safeName);
+  return `uploads/${jobId}/${safeName}`;
 }
 
 export function invoicePath(invoiceId: string): string {
-  return path.join("invoices", `${invoiceId}.pdf`);
+  return `invoices/${invoiceId}.pdf`;
 }
