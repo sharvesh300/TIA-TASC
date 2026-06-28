@@ -40,6 +40,14 @@ export function updateJob(id: string, data: Prisma.PipelineJobUpdateInput) {
   return prisma.pipelineJob.update({ where: { id }, data });
 }
 
+export function listExtractedRowsByClientPeriod(clientId: string, payPeriod: string) {
+  return prisma.extractedRow.findMany({
+    where: { clientId, payPeriod },
+    include: { job: { select: { id: true, createdAt: true, originalFileName: true } } },
+    orderBy: { job: { createdAt: "asc" } },
+  });
+}
+
 export function replaceExtractedRows(
   jobId: string,
   clientId: string,

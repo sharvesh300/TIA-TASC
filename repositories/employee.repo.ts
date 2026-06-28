@@ -32,6 +32,7 @@ export function countActiveEmployees() {
 
 export function createEmployee(data: {
   clientId?: string | null;
+  contractId?: string | null;
   empId: string;
   fullName: string;
   email?: string | null;
@@ -48,6 +49,7 @@ export function updateEmployee(
   id: string,
   data: Partial<{
     clientId: string | null;
+    contractId: string | null;
     empId: string;
     fullName: string;
     email: string | null;
@@ -71,7 +73,15 @@ export function assignEmployeeToClient(employeeId: string, clientId: string) {
 }
 
 export function unassignEmployeeFromClient(employeeId: string) {
-  return updateEmployee(employeeId, { clientId: null });
+  return updateEmployee(employeeId, { clientId: null, contractId: null });
+}
+
+export function assignEmployeeToContract(employeeId: string, contractId: string) {
+  return updateEmployee(employeeId, { contractId });
+}
+
+export function unassignEmployeeFromContract(employeeId: string) {
+  return updateEmployee(employeeId, { contractId: null });
 }
 
 export async function listEmployeesFiltered({

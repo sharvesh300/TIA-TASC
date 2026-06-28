@@ -5,7 +5,9 @@ import { prisma } from "@/lib/prisma";
 import {
   VALIDATION_RULE_CODES,
   DEFAULT_VALIDATION_RULES,
+  DEFAULT_CONTRACT_WORK_RULES,
   type ClientValidationRulesConfig,
+  type ContractWorkRulesConfig,
 } from "@/lib/constants";
 import { getInvoiceById, updateInvoice } from "@/repositories/invoice.repo";
 import { recordEvent } from "@/repositories/event.repo";
@@ -96,6 +98,77 @@ export async function runValidations(invoiceId: string, actorId?: string | null)
       status: duplicates === 0 ? "PASS" : severity,
       expected: "0 duplicates",
       actual: `${duplicates} duplicated employee id(s)`,
+    });
+  }
+
+  // Contract-side work rules (overtime/worktime governance). These come from
+  // the contract attached to the invoice at generation time; if there's no
+  // contract or no workRules configured, fall back to sane defaults rather
+  // than skipping the checks outright.
+  const contract = invoice.contractId
+    ? await prisma.contract.findUnique({ where: { id: invoice.contractId } })
+    : null;
+  const workRules: ContractWorkRulesConfig = contract?.workRules
+    ? JSON.parse(JSON.stringify(contract.workRules))
+    : DEFAULT_CONTRACT_WORK_RULES;
+  const workRuleValidation = workRules.validation ?? DEFAULT_CONTRACT_WORK_RULES.validation!;
+
+  // 5. Overtime present despite the contract not allowing it.
+  const otNotAllowedMatcher = workRuleValidation.OVERTIME_NOT_ALLOWED_BUT_PRESENT;
+  if (otNotAllowedMatcher?.enabled !== false && workRules.overtimeAllowed === false) {
+    const severity = otNotAllowedMatcher?.severity ?? "BLOCKER";
+    const withOvertime = lines.filter((l) => Number(l.otHours) > 0);
+    outcomes.push({
+      ruleCode: VALIDATION_RULE_CODES.OVERTIME_NOT_ALLOWED_BUT_PRESENT,
+      ruleLabel: "Overtime not allowed by contract",
+      status: withOvertime.length === 0 ? "PASS" : severity,
+      expected: "0 lines with overtime",
+      actual: `${withOvertime.length} line(s) with overtime hours`,
+    });
+  }
+
+  // 6. Overtime hours exceed the contract's per-period cap (derived from the
+  // per-day cap × the line's working days).
+  const otCapMatcher = workRuleValidation.OVERTIME_EXCEEDS_CAP;
+  if (otCapMatcher?.enabled !== false && workRules.overtimeAllowed !== false) {
+    const severity = otCapMatcher?.severity ?? "WARNING";
+    const maxOtPerDay = workRules.maxOvertimeHoursPerDay ?? DEFAULT_CONTRACT_WORK_RULES.maxOvertimeHoursPerDay!;
+    const overCap = lines.filter((l) => Number(l.otHours) > maxOtPerDay * Number(l.workingDays));
+    outcomes.push({
+      ruleCode: VALIDATION_RULE_CODES.OVERTIME_EXCEEDS_CAP,
+      ruleLabel: `Overtime within ${maxOtPerDay}h/day cap`,
+      status: overCap.length === 0 ? "PASS" : severity,
+      expected: `≤ ${maxOtPerDay}h/day`,
+      actual: `${overCap.length} line(s) over cap`,
+    });
+  }
+
+  // 7. Net worktime mismatch: cross-validate payroll's otAmount against what
+  // the contract's overtime multiplier would produce for the recorded
+  // overtime hours, instead of trusting otAmount verbatim.
+  const netWorktimeMatcher = workRuleValidation.NET_WORKTIME_MISMATCH;
+  if (netWorktimeMatcher?.enabled !== false) {
+    const tolerance = netWorktimeMatcher?.tolerance ?? 0.05;
+    const severity = netWorktimeMatcher?.severity ?? "WARNING";
+    const standardHours = workRules.standardHoursPerShift ?? DEFAULT_CONTRACT_WORK_RULES.standardHoursPerShift!;
+    const otMultiplier = workRules.overtimeMultiplier ?? DEFAULT_CONTRACT_WORK_RULES.overtimeMultiplier!;
+    const mismatches = lines.filter((l) => {
+      const workingDays = Number(l.workingDays);
+      const otHours = Number(l.otHours);
+      if (otHours <= 0 || workingDays <= 0 || standardHours <= 0) return false;
+      const hourlyRate = Number(l.gross) / (standardHours * workingDays);
+      if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) return false;
+      const expectedOtAmount = otHours * hourlyRate * otMultiplier;
+      const actualOtAmount = Number(l.otAmount);
+      const diff = Math.abs(expectedOtAmount - actualOtAmount);
+      return diff > tolerance * Math.max(expectedOtAmount, 1);
+    });
+    outcomes.push({
+      ruleCode: VALIDATION_RULE_CODES.NET_WORKTIME_MISMATCH,
+      ruleLabel: "Overtime amount matches contract worktime rules",
+      status: mismatches.length === 0 ? "PASS" : severity,
+      expected: `within ${(tolerance * 100).toFixed(0)}% of contract-derived OT amount`,
+      actual: `${mismatches.length} line(s) mismatched`,
     });
   }
 

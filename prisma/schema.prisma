@@ -134,6 +134,8 @@ model Employee {
   email         String?
   clientId      String?
   client        Client?        @relation(fields: [clientId], references: [id])
+  contractId    String?
+  contract      Contract?      @relation(fields: [contractId], references: [id])
   jobTitle      String?
   department    String?
   nationality   String?
@@ -149,6 +151,7 @@ model Employee {
 
   @@unique([clientId, empId])
   @@index([clientId])
+  @@index([contractId])
 }
 
 model Payroll {
@@ -238,6 +241,7 @@ model Contract {
   markupPercent     Decimal  @default(0)
   paymentTermsDays  Int      @default(30)
   currency          String   @default("AED")
+  workRules         Json?
 
   validFrom         DateTime
   validTo           DateTime?
@@ -245,6 +249,7 @@ model Contract {
   description       String?
 
   invoices          Invoice[]
+  employees         Employee[]
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -292,6 +297,7 @@ model InvoiceLine {
   empId        String
   employeeName String
   gross        Decimal   @default(0)
+  otHours      Decimal   @default(0)
   otAmount     Decimal   @default(0)
   deductions   Decimal   @default(0)
   netPay       Decimal   @default(0)

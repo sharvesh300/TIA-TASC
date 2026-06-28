@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@/lib/generated/prisma/client";
+import { Prisma } from "@/lib/generated/prisma/client";
 
 export function createContract(data: Prisma.ContractCreateInput) {
   return prisma.contract.create({ data });
@@ -44,6 +44,7 @@ export async function updateContract(
     currency?: string;
     description?: string;
     validFrom?: Date;
+    workRules?: Prisma.InputJsonValue | null;
   }
 ) {
   const current = await getContractById(id);
@@ -67,6 +68,10 @@ export async function updateContract(
       paymentTermsDays: data.paymentTermsDays ?? current.paymentTermsDays,
       currency: data.currency ?? current.currency,
       description: data.description ?? current.description,
+      workRules:
+        data.workRules !== undefined
+          ? data.workRules ?? Prisma.JsonNull
+          : (current.workRules as Prisma.InputJsonValue | undefined) ?? undefined,
       validFrom: data.validFrom || new Date(),
       validTo: null,
       status: "ACTIVE",
@@ -87,6 +92,7 @@ export async function createContractVersion(
     currency: string;
     description?: string;
     validFrom?: Date;
+    workRules?: Prisma.InputJsonValue | null;
   }
 ) {
   const validFrom = data.validFrom || new Date();
@@ -102,6 +108,7 @@ export async function createContractVersion(
       currency: data.currency,
       description: data.description,
       validFrom,
+      workRules: data.workRules,
     });
   }
 
@@ -113,6 +120,7 @@ export async function createContractVersion(
       paymentTermsDays: data.paymentTermsDays,
       currency: data.currency,
       description: data.description,
+      workRules: data.workRules ?? undefined,
       validFrom,
       validTo: null,
       status: "ACTIVE",
@@ -122,4 +130,31 @@ export async function createContractVersion(
 
 export function deleteContract(id: string) {
   return prisma.contract.delete({ where: { id } });
+}
+
+/**
+ * Resolve the contract that should govern an employee's billing for a given
+ * date: the employee's directly-assigned contract takes precedence (when it
+ * is still ACTIVE and covers the date) over the client's active contract.
+ * This lets a client run multiple concurrent contracts (e.g. per site or
+ * department) instead of every employee defaulting to the single active one.
+ */
+export async function getContractForEmployee(
+  employee: { contractId: string | null },
+  clientId: string,
+  asOfDate: Date
+) {
+  if (employee.contractId) {
+    const assigned = await prisma.contract.findFirst({
+      where: {
+        id: employee.contractId,
+        clientId,
+        status: "ACTIVE",
+        validFrom: { lte: asOfDate },
+        OR: [{ validTo: null }, { validTo: { gt: asOfDate } }],
+      },
+    });
+    if (assigned) return assigned;
+  }
+  return getActiveContract(clientId, asOfDate);
 }

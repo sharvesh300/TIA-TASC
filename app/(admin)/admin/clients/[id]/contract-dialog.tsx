@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { createContractVersionAction, type ContractFormState } from "../actions";
+import { DEFAULT_CONTRACT_WORK_RULES, type ContractWorkRulesConfig } from "@/lib/constants";
 
 const initialState: ContractFormState = {};
 
@@ -31,9 +32,11 @@ function SubmitButton() {
 export function NewContractDialog({
   clientId,
   defaultCurrency,
+  defaultWorkRules,
 }: {
   clientId: string;
   defaultCurrency?: string;
+  defaultWorkRules?: ContractWorkRulesConfig | null;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createContractVersionAction, initialState);
@@ -47,6 +50,7 @@ export function NewContractDialog({
   }, [pending, state.error]);
 
   const today = new Date().toISOString().slice(0, 10);
+  const wr = { ...DEFAULT_CONTRACT_WORK_RULES, ...defaultWorkRules };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -56,7 +60,7 @@ export function NewContractDialog({
           New contract version
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <form action={formAction}>
           <input type="hidden" name="clientId" value={clientId} />
           <DialogHeader>
@@ -65,27 +69,133 @@ export function NewContractDialog({
               The current active contract (if any) will be archived and replaced by this version.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="markupPercent">Markup %</Label>
-              <Input id="markupPercent" name="markupPercent" type="number" step="0.01" min="0" required />
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Billing terms</h3>
+              <div className="grid gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="markupPercent">Markup %</Label>
+                  <Input id="markupPercent" name="markupPercent" type="number" step="0.01" min="0" required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="paymentTermsDays">Payment terms (days)</Label>
+                  <Input
+                    id="paymentTermsDays"
+                    name="paymentTermsDays"
+                    type="number"
+                    min="0"
+                    defaultValue={30}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Input id="currency" name="currency" defaultValue={defaultCurrency ?? "AED"} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="validFrom">Valid from</Label>
+                  <Input id="validFrom" name="validFrom" type="date" defaultValue={today} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="description">Description</Label>
+                  <Input id="description" name="description" />
+                </div>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="paymentTermsDays">Payment terms (days)</Label>
-              <Input id="paymentTermsDays" name="paymentTermsDays" type="number" min="0" defaultValue={30} required />
+
+            <div className="space-y-3 border-t pt-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Work rules</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="standardHoursPerShift">Standard hours/shift</Label>
+                  <Input
+                    id="standardHoursPerShift"
+                    name="standardHoursPerShift"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    defaultValue={wr.standardHoursPerShift}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="standardHoursPerWeek">Standard hours/week</Label>
+                  <Input
+                    id="standardHoursPerWeek"
+                    name="standardHoursPerWeek"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    defaultValue={wr.standardHoursPerWeek}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="breakDeductionMinutes">Break deduction (min)</Label>
+                  <Input
+                    id="breakDeductionMinutes"
+                    name="breakDeductionMinutes"
+                    type="number"
+                    min="0"
+                    defaultValue={wr.breakDeductionMinutes}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="shiftAllowance">Shift allowance</Label>
+                  <Input
+                    id="shiftAllowance"
+                    name="shiftAllowance"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={wr.shiftAllowance}
+                  />
+                </div>
+                <div className="col-span-2 flex items-center gap-2">
+                  <input
+                    id="overtimeAllowed"
+                    name="overtimeAllowed"
+                    type="checkbox"
+                    defaultChecked={wr.overtimeAllowed}
+                    className="size-4 rounded border-input"
+                  />
+                  <Label htmlFor="overtimeAllowed">Overtime allowed</Label>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="overtimeMultiplier">Overtime multiplier</Label>
+                  <Input
+                    id="overtimeMultiplier"
+                    name="overtimeMultiplier"
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    defaultValue={wr.overtimeMultiplier}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="maxOvertimeHoursPerDay">Max OT hours/day</Label>
+                  <Input
+                    id="maxOvertimeHoursPerDay"
+                    name="maxOvertimeHoursPerDay"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    defaultValue={wr.maxOvertimeHoursPerDay}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="maxOvertimeHoursPerWeek">Max OT hours/week</Label>
+                  <Input
+                    id="maxOvertimeHoursPerWeek"
+                    name="maxOvertimeHoursPerWeek"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    defaultValue={wr.maxOvertimeHoursPerWeek}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="currency">Currency</Label>
-              <Input id="currency" name="currency" defaultValue={defaultCurrency ?? "AED"} required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="validFrom">Valid from</Label>
-              <Input id="validFrom" name="validFrom" type="date" defaultValue={today} required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="description">Description</Label>
-              <Input id="description" name="description" />
-            </div>
+
             {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           </div>
           <DialogFooter>

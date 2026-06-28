@@ -4,10 +4,10 @@
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_CURRENCY, DEFAULT_PAY_PERIOD } from "@/agents/_shared";
-import { getJobWithRelations } from "@/repositories/job.repo";
+import { getJobWithRelations, listExtractedRowsByClientPeriod } from "@/repositories/job.repo";
 import { getPayroll } from "@/repositories/payroll.repo";
 import { createInvoice, getInvoiceByClientPeriod } from "@/repositories/invoice.repo";
-import { getActiveContract } from "@/repositories/contract.repo";
+import { getActiveContract, getContractForEmployee } from "@/repositories/contract.repo";
 import { transition } from "@/services/pipeline.service";
 import { resolveEmployeeMatch } from "@/services/employee-match.service";
 
@@ -54,8 +54,22 @@ export async function generateInvoice(jobId: string, actorId?: string | null) {
   let totalBilled = 0;
   const markupPercent = Number(contract.markupPercent) || 0;
   const unresolvedRows: string[] = [];
+  const markupsApplied = new Set<number>();
 
-  for (const row of job.extractedRows) {
+  // Pull rows across every job for this client+period, not just this one —
+  // the same employee can appear in more than one uploaded file for the same
+  // period (corrections, supplementary files). Resolve each row to an
+  // employee first, then dedupe by employee, keeping the row from the most
+  // recently uploaded job so a later file always supersedes an earlier one.
+  const periodRows = await listExtractedRowsByClientPeriod(job.clientId, payPeriod);
+
+  const resolvedByEmployee = new Map<
+    string,
+    { row: (typeof periodRows)[number]; employee: NonNullable<Awaited<ReturnType<typeof resolveEmployeeMatch>>["employee"]> }
+  >();
+  const duplicatesResolved: { employeeName: string; keptFile: string | null; droppedFile: string | null }[] = [];
+
+  for (const row of periodRows) {
     const match = await resolveEmployeeMatch(job.clientId, {
       empId: row.empId,
       fullName: row.fullName,
@@ -71,15 +85,44 @@ export async function generateInvoice(jobId: string, actorId?: string | null) {
     }
 
     const employee = match.employee!;
+    const existing = resolvedByEmployee.get(employee.id);
+
+    if (!existing) {
+      resolvedByEmployee.set(employee.id, { row, employee });
+      continue;
+    }
+
+    // Same employee resolved from a different file for this period — keep
+    // whichever row's job was uploaded later.
+    const keepNewRow = row.job.createdAt > existing.row.job.createdAt;
+    duplicatesResolved.push({
+      employeeName: employee.fullName,
+      keptFile: keepNewRow ? row.job.originalFileName : existing.row.job.originalFileName,
+      droppedFile: keepNewRow ? existing.row.job.originalFileName : row.job.originalFileName,
+    });
+    if (keepNewRow) {
+      resolvedByEmployee.set(employee.id, { row, employee });
+    }
+  }
+
+  for (const { row, employee } of resolvedByEmployee.values()) {
     const payroll = await getPayroll(employee.id, payPeriod);
 
     const gross = payroll ? Number(payroll.gross) : 0;
+    const otHours = payroll ? Number(payroll.otHours) : 0;
     const otAmount = payroll ? Number(payroll.otAmount) : 0;
     const deductions = payroll ? Number(payroll.deductions) : 0;
     const netPay = payroll ? Number(payroll.netPay) : 0;
 
+    // The employee's directly-assigned contract (if any) governs their
+    // markup instead of always falling back to the client's one active
+    // contract — a client can run several concurrent contracts.
+    const employeeContract = await getContractForEmployee(employee, job.clientId, payPeriodDate);
+    const lineMarkupPercent = Number(employeeContract?.markupPercent ?? contract.markupPercent) || 0;
+    markupsApplied.add(lineMarkupPercent);
+
     // Compute billedAmount using contract markup: billedAmount = netPay × (1 + markupPercent/100)
-    const billedAmount = netPay * (1 + markupPercent / 100);
+    const billedAmount = netPay * (1 + lineMarkupPercent / 100);
     totalBilled += billedAmount;
 
     lines.push({
@@ -87,6 +130,7 @@ export async function generateInvoice(jobId: string, actorId?: string | null) {
       empId: employee.empId,
       employeeName: employee.fullName,
       gross,
+      otHours,
       otAmount,
       deductions,
       netPay,
@@ -136,8 +180,22 @@ export async function generateInvoice(jobId: string, actorId?: string | null) {
     type: "INVOICE_GENERATED",
     actor: "SYSTEM",
     actorId,
-    message: `Invoice created: ${currency} ${totalBilled.toFixed(2)} (${lines.length} lines, ${markupPercent}% markup)`,
-    metadata: { invoiceId: invoice.id, total: totalBilled, currency, payPeriod, contractId: contract.id },
+    message:
+      `Invoice created: ${currency} ${totalBilled.toFixed(2)} (${lines.length} lines, ` +
+      (markupsApplied.size > 1
+        ? `mixed markup rates across contracts)`
+        : `${[...markupsApplied][0] ?? markupPercent}% markup)`) +
+      (duplicatesResolved.length > 0
+        ? ` — ${duplicatesResolved.length} duplicate employee row(s) resolved using the most recently uploaded file`
+        : ""),
+    metadata: {
+      invoiceId: invoice.id,
+      total: totalBilled,
+      currency,
+      payPeriod,
+      contractId: contract.id,
+      duplicatesResolved,
+    },
   });
 
   return invoice;

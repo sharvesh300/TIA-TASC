@@ -1,10 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import { requireRole } from "@/lib/require-role";
 import { createClient, updateClient } from "@/repositories/client.repo";
 import { createContractVersion } from "@/repositories/contract.repo";
-import { assignEmployeeToClient, unassignEmployeeFromClient } from "@/repositories/employee.repo";
+import {
+  assignEmployeeToClient,
+  unassignEmployeeFromClient,
+  assignEmployeeToContract,
+  unassignEmployeeFromContract,
+} from "@/repositories/employee.repo";
+import { DEFAULT_CONTRACT_WORK_RULES, type ContractWorkRulesConfig } from "@/lib/constants";
 
 export type ClientFormState = { error?: string };
 export type ContractFormState = { error?: string };
@@ -94,6 +101,25 @@ export async function createContractVersionAction(
     return { error: "A valid payment terms (days) is required." };
   }
 
+  const numField = (name: string, fallback: number) => {
+    const raw = formData.get(name);
+    if (raw === null || raw === "") return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const workRules: ContractWorkRulesConfig = {
+    standardHoursPerShift: numField("standardHoursPerShift", DEFAULT_CONTRACT_WORK_RULES.standardHoursPerShift!),
+    standardHoursPerWeek: numField("standardHoursPerWeek", DEFAULT_CONTRACT_WORK_RULES.standardHoursPerWeek!),
+    breakDeductionMinutes: numField("breakDeductionMinutes", DEFAULT_CONTRACT_WORK_RULES.breakDeductionMinutes!),
+    shiftAllowance: numField("shiftAllowance", DEFAULT_CONTRACT_WORK_RULES.shiftAllowance!),
+    overtimeAllowed: formData.get("overtimeAllowed") === "on",
+    overtimeMultiplier: numField("overtimeMultiplier", DEFAULT_CONTRACT_WORK_RULES.overtimeMultiplier!),
+    maxOvertimeHoursPerDay: numField("maxOvertimeHoursPerDay", DEFAULT_CONTRACT_WORK_RULES.maxOvertimeHoursPerDay!),
+    maxOvertimeHoursPerWeek: numField("maxOvertimeHoursPerWeek", DEFAULT_CONTRACT_WORK_RULES.maxOvertimeHoursPerWeek!),
+    validation: DEFAULT_CONTRACT_WORK_RULES.validation,
+  };
+
   try {
     await createContractVersion(clientId, {
       markupPercent,
@@ -101,6 +127,7 @@ export async function createContractVersionAction(
       currency,
       description,
       validFrom,
+      workRules: workRules as unknown as Prisma.InputJsonValue,
     });
   } catch {
     return { error: "Could not create contract version." };
@@ -124,5 +151,19 @@ export async function assignEmployeeAction(clientId: string, employeeId: string)
 export async function unassignEmployeeAction(employeeId: string, clientId: string) {
   await requireRole(["ADMIN"]);
   await unassignEmployeeFromClient(employeeId);
+  revalidatePath(`/admin/clients/${clientId}`);
+}
+
+export async function assignEmployeeContractAction(
+  employeeId: string,
+  clientId: string,
+  contractId: string | null
+) {
+  await requireRole(["ADMIN"]);
+  if (contractId) {
+    await assignEmployeeToContract(employeeId, contractId);
+  } else {
+    await unassignEmployeeFromContract(employeeId);
+  }
   revalidatePath(`/admin/clients/${clientId}`);
 }

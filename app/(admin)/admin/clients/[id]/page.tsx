@@ -21,6 +21,7 @@ import { EmployeeRoster } from "./employee-roster";
 import { EmployeeAssign } from "./employee-assign";
 import { NewEmployeeDialog } from "../../employees/employee-dialog";
 import { formatDate } from "@/lib/utils";
+import { DEFAULT_CONTRACT_WORK_RULES, type ContractWorkRulesConfig } from "@/lib/constants";
 
 export default async function ClientDetailPage({
   params,
@@ -40,6 +41,13 @@ export default async function ClientDetailPage({
   ]);
 
   const latestContract = contracts.find((c) => c.status === "ACTIVE");
+  const latestWorkRules: ContractWorkRulesConfig = latestContract?.workRules
+    ? JSON.parse(JSON.stringify(latestContract.workRules))
+    : DEFAULT_CONTRACT_WORK_RULES;
+  const contractOptions = contracts.map((c) => ({
+    id: c.id,
+    label: `${formatDate(c.validFrom)} · ${Number(c.markupPercent)}% (${c.status})`,
+  }));
 
   return (
     <div className="space-y-4">
@@ -66,7 +74,11 @@ export default async function ClientDetailPage({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Contracts</CardTitle>
-          <NewContractDialog clientId={client.id} defaultCurrency={latestContract?.currency} />
+          <NewContractDialog
+            clientId={client.id}
+            defaultCurrency={latestContract?.currency}
+            defaultWorkRules={latestWorkRules}
+          />
         </CardHeader>
         <CardContent>
           <Table>
@@ -77,6 +89,7 @@ export default async function ClientDetailPage({
                 <TableHead>Markup %</TableHead>
                 <TableHead>Payment terms</TableHead>
                 <TableHead>Currency</TableHead>
+                <TableHead>Overtime</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Description</TableHead>
               </TableRow>
@@ -84,26 +97,36 @@ export default async function ClientDetailPage({
             <TableBody>
               {contracts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                     No contracts yet.
                   </TableCell>
                 </TableRow>
               )}
-              {contracts.map((contract) => (
-                <TableRow key={contract.id}>
-                  <TableCell>{formatDate(contract.validFrom)}</TableCell>
-                  <TableCell>{formatDate(contract.validTo)}</TableCell>
-                  <TableCell>{Number(contract.markupPercent)}%</TableCell>
-                  <TableCell>{contract.paymentTermsDays} days</TableCell>
-                  <TableCell>{contract.currency}</TableCell>
-                  <TableCell>
-                    <Badge variant={contract.status === "ACTIVE" ? "default" : "secondary"}>
-                      {contract.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{contract.description ?? "—"}</TableCell>
-                </TableRow>
-              ))}
+              {contracts.map((contract) => {
+                const wr: ContractWorkRulesConfig = contract.workRules
+                  ? JSON.parse(JSON.stringify(contract.workRules))
+                  : DEFAULT_CONTRACT_WORK_RULES;
+                return (
+                  <TableRow key={contract.id}>
+                    <TableCell>{formatDate(contract.validFrom)}</TableCell>
+                    <TableCell>{formatDate(contract.validTo)}</TableCell>
+                    <TableCell>{Number(contract.markupPercent)}%</TableCell>
+                    <TableCell>{contract.paymentTermsDays} days</TableCell>
+                    <TableCell>{contract.currency}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {wr.overtimeAllowed
+                        ? `Allowed, ${wr.overtimeMultiplier}x (≤${wr.maxOvertimeHoursPerDay}h/day)`
+                        : "Not allowed"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={contract.status === "ACTIVE" ? "default" : "secondary"}>
+                        {contract.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{contract.description ?? "—"}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -116,7 +139,7 @@ export default async function ClientDetailPage({
         </CardHeader>
         <CardContent className="space-y-4">
           <EmployeeAssign clientId={client.id} unassignedEmployees={unassignedEmployees} />
-          <EmployeeRoster clientId={client.id} employees={employees} />
+          <EmployeeRoster clientId={client.id} employees={employees} contracts={contractOptions} />
         </CardContent>
       </Card>
     </div>
