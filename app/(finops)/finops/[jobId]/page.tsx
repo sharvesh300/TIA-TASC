@@ -62,7 +62,12 @@ export default async function FinOpsJobPage({
         </p>
       )}
 
-      <JobActions jobId={job.id} status={job.status} invoiceId={invoice?.id} />
+      <JobActions
+        jobId={job.id}
+        status={job.status}
+        invoiceId={invoice?.id}
+        invoiceStatus={invoice?.status}
+      />
 
       <Card>
         <CardHeader>

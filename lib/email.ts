@@ -49,3 +49,39 @@ export async function sendInvoiceEmail(input: SendInvoiceEmailInput): Promise<Se
 
   return { mocked: false, messageId: info.messageId, to: input.to, cc };
 }
+
+export interface SendNotificationEmailInput {
+  to: string;
+  cc?: string[];
+  subject: string;
+  body: string;
+}
+
+/** Plain-text notification (no PDF attachment) — used for status updates like
+ * a rejected or held invoice, as opposed to the invoice delivery itself. */
+export async function sendNotificationEmail(
+  input: SendNotificationEmailInput
+): Promise<SendInvoiceEmailResult> {
+  const cc = input.cc ?? [];
+
+  if (!smtpConfigured()) {
+    return { mocked: true, to: input.to, cc };
+  }
+
+  const transport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+
+  const info = await transport.sendMail({
+    from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+    to: input.to,
+    cc,
+    subject: input.subject,
+    text: input.body,
+  });
+
+  return { mocked: false, messageId: info.messageId, to: input.to, cc };
+}

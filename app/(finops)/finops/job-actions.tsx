@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FileText, RefreshCw, ShieldCheck, PlayCircle } from "lucide-react";
+import { FileText, RefreshCw, ShieldCheck, PlayCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { JobStatus } from "@/lib/generated/prisma/client";
+import { Input } from "@/components/ui/input";
+import type { InvoiceStatus, JobStatus } from "@/lib/generated/prisma/client";
 import {
   generateInvoiceAction,
+  rejectInvoiceAction,
   rerunExtractionAction,
   resumeJobAction,
   validateInvoiceAction,
@@ -16,13 +18,17 @@ export function JobActions({
   jobId,
   status,
   invoiceId,
+  invoiceStatus,
 }: {
   jobId: string;
   status: JobStatus;
   invoiceId?: string;
+  invoiceStatus?: InvoiceStatus;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState(false);
+  const [note, setNote] = useState("");
 
   function run(action: () => Promise<void>) {
     setError(null);
@@ -35,10 +41,21 @@ export function JobActions({
     });
   }
 
+  function reject() {
+    if (!invoiceId) return;
+    run(async () => {
+      await rejectInvoiceAction(jobId, invoiceId, note || "No reason provided");
+      setRejecting(false);
+      setNote("");
+    });
+  }
+
   const canExtract = status !== "DISPATCHED" && status !== "NEEDS_REVIEW";
   const canResume = status === "NEEDS_REVIEW";
   const canGenerate = status === "EXTRACTED";
   const canValidate = status === "VALIDATING" && Boolean(invoiceId);
+  const canReject =
+    Boolean(invoiceId) && invoiceStatus !== "DISPATCHED" && invoiceStatus !== "REJECTED";
 
   return (
     <div className="flex flex-col gap-2">
@@ -76,7 +93,31 @@ export function JobActions({
             Run validation
           </Button>
         )}
+        {canReject && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRejecting((v) => !v)}
+            disabled={pending}
+          >
+            <X />
+            Reject
+          </Button>
+        )}
       </div>
+      {rejecting && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            placeholder="Reason for rejection"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="max-w-sm"
+          />
+          <Button variant="destructive" size="sm" onClick={reject} disabled={pending}>
+            Confirm reject
+          </Button>
+        </div>
+      )}
       {canResume && !error && (
         <p className="text-xs text-muted-foreground">
           The pipeline auto-advances after extraction, invoicing, and validation. Use{" "}

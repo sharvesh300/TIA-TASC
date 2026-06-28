@@ -12,6 +12,7 @@ import {
 import { getInvoiceById, updateInvoice } from "@/repositories/invoice.repo";
 import { recordEvent } from "@/repositories/event.repo";
 import { transition } from "@/services/pipeline.service";
+import { sendNotificationEmail } from "@/lib/email";
 
 interface RuleOutcome {
   ruleCode: string;
@@ -192,6 +193,24 @@ export async function runValidations(invoiceId: string, actorId?: string | null)
 
   if (hasBlocker) {
     await updateInvoice(invoiceId, { status: "DRAFT" });
+
+    // Best-effort: let the client know their invoice is held and why, rather
+    // than leaving them to find out only when it's late. A failed send here
+    // must not block the validation result itself.
+    const failedRules = outcomes
+      .filter((o) => o.status === "BLOCKER")
+      .map((o) => `${o.ruleLabel} (expected ${o.expected ?? "—"}, got ${o.actual ?? "—"})`);
+    const to = client.contactEmail ?? `accounts@${client.code.toLowerCase()}.com`;
+    await sendNotificationEmail({
+      to,
+      subject: `Invoice for ${invoice.payPeriod} held — validation issue`,
+      body:
+        `Your invoice for ${invoice.payPeriod} (${invoice.currency} ${Number(invoice.totalAmount).toFixed(2)}) ` +
+        `could not be finalized due to the following issue(s):\n\n` +
+        failedRules.map((r) => `- ${r}`).join("\n") +
+        `\n\nOur team is reviewing this. No action is needed unless you're asked to resubmit timesheet data.`,
+    }).catch(() => {});
+
     if (invoice.pipelineJobId) {
       // A blocker is a fixable data issue, not a system failure — surface it
       // in the inbox as NEEDS_REVIEW rather than leaving the job stuck in

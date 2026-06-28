@@ -29,7 +29,7 @@ export async function runExtraction(jobId: string, actorId?: string | null) {
     let engine: ExtractionEngine = job.format === "XLSX" ? "EXCEL" : "TESSERACT";
     let result = await routeDocument(job.format, buffer, job.originalFileName);
 
-    // Escalate OCR paths to GPT-4o when confidence is low or nothing parsed.
+    // Escalate OCR paths to Gemini when confidence is low or nothing parsed.
     const needsEscalation =
       engine !== "EXCEL" &&
       (result.rows.length === 0 || result.overallConfidence < CONFIDENCE_THRESHOLDS.NEEDS_REVIEW);
@@ -39,8 +39,9 @@ export async function runExtraction(jobId: string, actorId?: string | null) {
         format: job.format,
         buffer,
         priorRows: result.rows,
+        mimeType: job.mimeType,
       });
-      engine = "GPT4O";
+      engine = "GPT4O"; // Keep database enum value as GPT4O to avoid DB migrations
       result = { rows: gpt.rows, overallConfidence: gpt.overallConfidence };
       await recordEvent({
         jobId,
@@ -49,8 +50,8 @@ export async function runExtraction(jobId: string, actorId?: string | null) {
         actorId,
         confidence: gpt.overallConfidence,
         message: gpt.mocked
-          ? "Escalated to GPT-4o (mock — OPENAI_API_KEY not set)"
-          : "Escalated to GPT-4o vision extraction",
+          ? "Escalated to Gemini (mock — GEMINI_API_KEY not set)"
+          : "Escalated to Gemini vision extraction",
         metadata: { mocked: gpt.mocked, rowCount: gpt.rows.length },
       });
     }

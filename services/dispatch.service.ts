@@ -2,7 +2,7 @@
 // preferred delivery channel (EMAIL/WEBHOOK/SFTP), mark the invoice DISPATCHED, and
 // advance the job to DISPATCHED. Rejection is also here.
 import type { Prisma } from "@/lib/generated/prisma/client";
-import { sendInvoiceEmail } from "@/lib/email";
+import { sendInvoiceEmail, sendNotificationEmail } from "@/lib/email";
 import { getInvoiceById, updateInvoice } from "@/repositories/invoice.repo";
 import { ensureInvoicePdf } from "@/services/pdf.service";
 import { transition } from "@/services/pipeline.service";
@@ -166,6 +166,16 @@ export async function rejectInvoice(invoiceId: string, note: string, userId?: st
     approvedAt: new Date(),
   });
 
+  const to = invoice.client.contactEmail ?? `accounts@${invoice.client.code.toLowerCase()}.com`;
+  await sendNotificationEmail({
+    to,
+    subject: `Invoice for ${invoice.payPeriod} rejected`,
+    body:
+      `Your invoice for ${invoice.payPeriod} (${invoice.currency} ${Number(invoice.totalAmount).toFixed(2)}) ` +
+      `has been rejected.\n\nReason: ${note}\n\n` +
+      `Please reach out if you have questions, or resubmit corrected timesheet data.`,
+  }).catch(() => {});
+
   if (invoice.pipelineJobId) {
     // Rejection is correctable, not terminal — send the job back to
     // NEEDS_REVIEW so FinOps can fix the underlying rows/contract and the
@@ -174,7 +184,7 @@ export async function rejectInvoice(invoiceId: string, note: string, userId?: st
       type: "FAILED",
       actor: "USER",
       actorId: userId,
-      message: `Invoice rejected by reviewer: ${note}`,
+      message: `Invoice rejected: ${note}`,
       metadata: { invoiceId } as unknown as Prisma.InputJsonValue,
     });
   }

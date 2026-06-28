@@ -6,6 +6,7 @@ import { resolveReview, type RowEdit } from "@/services/review.service";
 import { runExtraction } from "@/services/extraction.service";
 import { generateInvoice } from "@/services/invoice.service";
 import { runValidations } from "@/services/validation.service";
+import { rejectInvoice } from "@/services/dispatch.service";
 
 export async function resolveReviewAction(jobId: string, edits: RowEdit[]) {
   const session = await requireRole(["FINOPS", "ADMIN"]);
@@ -44,4 +45,12 @@ export async function validateInvoiceAction(jobId: string, invoiceId: string) {
   await runValidations(invoiceId, session.user.id);
   revalidatePath(`/finops/${jobId}`);
   revalidatePath("/finops");
+}
+
+export async function rejectInvoiceAction(jobId: string, invoiceId: string, note: string) {
+  const session = await requireRole(["FINOPS", "ADMIN"]);
+  await rejectInvoice(invoiceId, note, session.user.id);
+  revalidatePath(`/finops/${jobId}`);
+  revalidatePath("/finops");
+  revalidatePath("/finops/inbox");
 }
